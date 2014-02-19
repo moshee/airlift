@@ -1,0 +1,83 @@
+{{ define "config" }}
+  <form id="config">
+    <div id="host-box" title="This is the host that the URL will be appended to and returned when you upload a file. Leave it blank to use whichever host the uploader is accessed from.">
+      <label for="host">Host</label>
+      <input type="text" id="host" name="host" value="{{ .Host }}" placeholder="i.example.com">
+    </div>
+    <div id="port-box" title="This is the port that the server will listen on. You can set it to something other than 80 and set up a proxy with your existing web server.">
+      <label for="port">Port</label>
+      <input type="text" id="port" name="port" value="{{ .Port }}" placeholder="80">
+    </div>
+    <div id="directory-box" title="This is the directory on the server in which the uploaded files will reside.">
+      <label for="directory">Directory</label>
+      <input type="text" id="directory" name="directory" value="{{ .Directory }}" placeholder="/home/user/uploads">
+    </div>
+    <div id="password-box" title="Enter a new password here to change your password.">
+      <label for="password">New password</label>
+      <input type="password" id="password" name="password">
+    </div>
+    <div id="oldpass-box" title="Whatever changes you make, enter your current password here to make sure that you're you.">
+      <label for="oldpass">Current password</label>
+      <input type="password" id="oldpass" name="oldpass" required placeholder="Required">
+    </div>
+    <hr>
+    <button id="submit" type="button">Update configuration</button>
+    <a href="/logout">Log out</a>
+  </form>
+  <script>
+    function $(sel) { return document.querySelector(sel); }
+    function $$(sel) { return document.querySelectorAll(sel); }
+
+    window.addEventListener('load', function() {
+      var buttons = $$('button');
+
+      $('#submit').addEventListener('click', function() {
+        for (var i = 0, button; button = buttons[i]; i++) button.setAttribute('disabled', true);
+        var host = $('#host');
+        host.value = host.value.replace(/\w+:\/\//, '');
+        var fd = new FormData($('#config'));
+        var x = new XMLHttpRequest();
+        x.responseType = 'json';
+
+        x.addEventListener('load', function(e) {
+          $('#oldpass').value = '';
+          for (var i = 0, button; button = buttons[i]; i++) button.removeAttribute('disabled');
+          if (e.target.status === 204) {
+            showMessage('Configuration updated.', 'good');
+            $('#password').value = '';
+          } else {
+            var resp = JSON.parse(e.target.responseText);
+            if (resp != null && resp.Err != null) {
+              showMessage('Error: ' + resp.Err, 'bad');
+            } else {
+              showMessage('An unknown error occurred (status ' + e.target.status + ')', 'bad');
+            }
+          }
+        }, false);
+
+        x.open('POST', '/config', true);
+        x.send(fd);
+      }, false);
+    }, false);
+
+    function showMessage(msg, classname) {
+      var box = document.querySelector('#message-box');
+      if (box == null) {
+        box = document.createElement('div');
+        box.id = 'message-box';
+        document.body.insertBefore(box, document.querySelector('#config'));
+      }
+      box.className = classname;
+      box.innerText = msg;
+    }
+  </script>
+{{ end }}
+
+{{ define "login" }}
+  <form method="post" action="/login" id="login">
+    {{ if . }}<p id="message-box" class="bad">Incorrect password.</p>{{ end }}
+    <label for="password">Password: </label><input name="pass" id="password" type="password" placeholder="password" autofocus required>
+    <hr>
+    <button type="submit" id="submit">Log in</button>
+  </form>
+{{ end }}

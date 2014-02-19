@@ -1,0 +1,10 @@
+{{ define "error" }}<!doctype html>
+<body>
+  <p>{{ .Err }}</p>
+  <pre>{{ .Stack }}</pre>
+</body>
+{{ end }}
+
+{{ define "400" }}{{ template "error" . }}{{ end }}
+{{ define "404" }}404 not found{{ end }}
+{{ define "500" }}{{ template "error" . }}{{ end }}

@@ -1,0 +1,383 @@
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"log"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+	"time"
+)
+
+var (
+	flag_host   = flag.String("h", "", "Set host to upload to")
+	flag_port   = flag.String("p", "", "Set port or interface of remote server to upload to")
+	flag_addr   = flag.String("a", "", "Set whole address of server to upload to")
+	flag_nocopy = flag.Bool("C", false, "Do not copy link to clipboard")
+	flag_noprog = flag.Bool("P", false, "Do not show progress bar")
+	dotfilePath string
+)
+
+func init() {
+	log.SetFlags(log.Lshortfile)
+	flag.Usage = func() {
+		fmt.Fprintln(os.Stderr, `usage: lift [options] <filename>
+Options:`)
+
+		flag.PrintDefaults()
+
+		fmt.Fprintln(os.Stderr, `Optional parameters specify the connection details to the remote server. -a
+sets the entire URL, including scheme (and optional port), and overrides -h and
+-p.
+
+If options are specified, they will be saved in the configuration file.
+The location of this file is system-dependent:
+	$HOME/.airlift on POSIX;
+	%LOCALAPPDATA%\airlift\airlift_config on Windows.`)
+		os.Exit(1)
+	}
+	flag.Parse()
+}
+
+func main() {
+	conf, err := loadConfig()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	configured := config(conf)
+
+	if len(flag.Args()) < 1 {
+		if configured {
+			os.Exit(0)
+		} else {
+			flag.Usage()
+		}
+	}
+
+	tryPost(conf)
+}
+
+type NotAnError int
+
+func (err NotAnError) Error() string {
+	return "this is not an error"
+}
+
+const (
+	errPassNotFound NotAnError = iota // password not found for host
+	errNotCopying                     // not copying anything on this system (no clipboard)
+)
+
+func (c *Config) UploadURL() string {
+	return c.Scheme + "://" + c.Host + ":" + c.Port + "/upload/file"
+}
+
+func loadConfig() (*Config, error) {
+	file, err := os.Open(dotfilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			conf := &Config{
+				Scheme: "http",
+				Port:   "80",
+			}
+			return conf, writeConfig(conf)
+		}
+		return nil, err
+	}
+	defer file.Close()
+	conf := new(Config)
+	b := new(bytes.Buffer)
+	io.Copy(b, file)
+	if err := json.Unmarshal(b.Bytes(), conf); err != nil {
+		return nil, fmt.Errorf("Error reading config: %v", err)
+	}
+	return conf, nil
+}
+
+func writeConfig(conf *Config) error {
+	dir := filepath.Dir(dotfilePath)
+	os.MkdirAll(dir, os.FileMode(0755))
+	file, err := os.OpenFile(dotfilePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(0600))
+	if err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(conf, "", "    ")
+	if err != nil {
+		return err
+	}
+	file.Write(b)
+	return nil
+}
+
+func config(conf *Config) bool {
+	configured := false
+
+	if *flag_host != "" {
+		configured = true
+		conf.Host = *flag_host
+	}
+	if *flag_port != "" {
+		configured = true
+		conf.Port = *flag_port
+	}
+	if *flag_addr != "" {
+		configured = true
+		addr, err := url.Parse(*flag_addr)
+		if err != nil {
+			log.Fatalln("-a:", err)
+		}
+		conf.Scheme = addr.Scheme
+		host, port, err := net.SplitHostPort(addr.Host)
+		if err == nil {
+			conf.Host, conf.Port = host, port
+		} else {
+			conf.Host = path.Join(addr.Host, addr.Path)
+		}
+		if conf.Port == "" {
+			conf.Port = "80"
+		}
+	}
+	if conf.Scheme == "" {
+		conf.Scheme = "http"
+	}
+
+	if configured {
+		if err := writeConfig(conf); err != nil {
+			log.Fatalln(err)
+		}
+	}
+
+	return configured
+}
+
+// Post file to server. Keep retrying if the password is incorrect,
+// otherwise exit with success or other errors.
+func tryPost(conf *Config) {
+	if conf.Host == "" {
+		fmt.Fprintln(os.Stderr, "Host not configured.")
+		flag.Usage()
+	}
+
+	var (
+		alreadyWrong bool
+	)
+
+authLoop:
+	for {
+		resp := postFile(conf, flag.Arg(0))
+		var msg Resp
+		err := json.NewDecoder(resp.Body).Decode(&msg)
+		resp.Body.Close()
+		if err != nil {
+			log.Fatalln("error decoding server response:", err)
+		}
+
+		switch resp.StatusCode {
+		case http.StatusForbidden:
+			if alreadyWrong {
+				fmt.Fprintln(os.Stderr, "Sorry, wrong password.")
+			} else {
+				fmt.Fprintln(os.Stderr, "Server returned error:", msg.Err)
+				fmt.Fprintln(os.Stderr, "You'll need a new password. If the request is successful,")
+				fmt.Fprintf(os.Stderr, "it will be saved in %s.\n", PasswordStorageMechanism)
+				alreadyWrong = true
+			}
+			fmt.Fprint(os.Stderr, "Password: ")
+			pass, err := readPassword()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			if err = updatePassword(conf, pass); err != nil {
+				log.Fatalln(err)
+			}
+
+		case http.StatusCreated:
+			ret := conf.Scheme + "://" + msg.URL
+			fmt.Println(ret)
+			if !*flag_nocopy {
+				if err := copyString(ret); err != nil {
+					if err != errNotCopying {
+						fmt.Fprintln(os.Stderr, "(Error copying to clipboard: %v)\n", err)
+					}
+				} else {
+					fmt.Fprintln(os.Stderr, "(Copied to clipboard)")
+				}
+			}
+			break authLoop
+
+		default:
+			fmt.Fprintln(os.Stderr, resp.Status)
+			fmt.Fprintln(os.Stderr, "Server returned error:", msg.Err)
+			break authLoop
+		}
+	}
+
+}
+
+type Resp struct {
+	URL string
+	Err string
+}
+
+func newProgressReader(r io.ReadCloser, total int64) *ProgressReader {
+	p := &ProgressReader{
+		ReadCloser: r,
+		total:      total,
+		width:      getTermWidth(),
+		closed:     make(chan struct{}),
+	}
+	if p.width >= 3 {
+		p.buf = make([]rune, p.width-2)
+	}
+	return p
+}
+
+type ProgressReader struct {
+	io.ReadCloser
+	err     error
+	total   int64
+	current int64
+	width   int
+	buf     []rune
+	closed  chan struct{}
+}
+
+var barChars = []rune{' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉'}
+
+func (r *ProgressReader) Read(p []byte) (n int, err error) {
+	n, err = r.ReadCloser.Read(p)
+	r.current += int64(n)
+	r.err = err
+	return
+}
+
+func (r *ProgressReader) Close() error {
+	r.closed <- struct{}{}
+	return r.ReadCloser.Close()
+}
+
+func (r *ProgressReader) Report() {
+	if r.buf == nil {
+		return
+	}
+	defer fmt.Fprintln(os.Stderr)
+	t := time.NewTicker(33 * time.Millisecond)
+	for {
+		select {
+		case <-r.closed:
+			r.current = r.total
+			r.output()
+			return
+		case <-t.C:
+			if r.err != nil {
+				return
+			}
+			r.output()
+		}
+	}
+}
+
+func (r *ProgressReader) output() {
+	last := barChars[len(barChars)-1]
+	progress := float64(r.current) / float64(r.total)
+	q := float64(r.width-2)*progress + 1
+	x := int(q)
+	frac := barChars[int((q-float64(x))*float64(len(barChars)))]
+
+	ch := last
+	for i := 0; i < len(r.buf); i++ {
+		if i == x {
+			r.buf[i] = frac
+			ch = ' '
+		} else {
+			r.buf[i] = ch
+		}
+	}
+	fmt.Fprint(os.Stderr, "\033[J["+string(r.buf)+"]\n\033[1A")
+}
+
+func postFile(conf *Config, filename string) *http.Response {
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	var body io.ReadCloser
+
+	sz, err := file.Seek(0, os.SEEK_END)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	file.Seek(0, os.SEEK_SET)
+
+	// only show progress if the size is bigger than some arbitrary amount
+	// (512KiB) and -P isn't set
+	if sz > 512*1024 && !*flag_noprog {
+		r := newProgressReader(file, sz)
+		body = r
+
+		go r.Report()
+	} else {
+		body = file
+	}
+
+	req, err := http.NewRequest("POST", conf.UploadURL(), body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	req.Header.Set("X-Airlift-Filename", filepath.Base(os.Args[1]))
+
+	// attach the password. Only do so if there's a password stored for the
+	// given host.
+	pass, err := getPassword(conf)
+	switch err {
+	case nil:
+		req.Header.Set("X-Airlift-Password", pass)
+	case errPassNotFound:
+		break
+	default:
+		log.Fatalln(err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	return resp
+}
+
+// read a password from stdin, disabling console echo
+func readPassword() (string, error) {
+	/*
+		if err := toggleEcho(false); err != nil {
+			return "", err
+		}
+	*/
+	toggleEcho(false)
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	s := scanner.Text()
+	fmt.Fprintln(os.Stderr)
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+
+	/*
+		if err := toggleEcho(true); err != nil {
+			return "", err
+		}
+	*/
+	toggleEcho(true)
+	return s, nil
+}
