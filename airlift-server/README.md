@@ -17,10 +17,9 @@ doesn't support SSL/TLS standalone, but it's planned.
 Binaries for common platforms will be coming soon™. To build,
 
 1. [Install Go](http://golang.org/doc/install)
-2. ```$ cd /path/to/airlift-server
-$ go get github.com/moshee/gas
-$ go build
-```
+2. `$ cd /path/to/airlift-server`
+3. `$ go get github.com/moshee/gas`
+4. `$ go build`
 
 I haven't tried to build or run it on Windows, YMMV. Works on OS X and
 GNU+Linux.
