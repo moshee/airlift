@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -67,6 +68,8 @@ func main() {
 		}
 	}
 
+	urls := make([]string, 0, flag.NArg()+1)
+
 	if *flag_stdin {
 		tmp, err := ioutil.TempFile("", "airlift-upload")
 		if err != nil {
@@ -79,7 +82,11 @@ func main() {
 			s.Name = *flag_name
 			*flag_name = ""
 		}
-		tryPost(conf, s)
+		u := tryPost(conf, s)
+		if u == "" {
+			return
+		}
+		urls = append(urls, u)
 	}
 
 	for _, arg := range flag.Args() {
@@ -88,7 +95,22 @@ func main() {
 			log.Fatalln(err)
 		}
 		name := filepath.Base(file.Name())
-		tryPost(conf, FileUpload{name, file})
+		u := tryPost(conf, FileUpload{name, file})
+		if u == "" {
+			return
+		}
+		urls = append(urls, u)
+	}
+
+	if !*flag_nocopy {
+		str := strings.Join(urls, "\n")
+		if err := copyString(str); err != nil {
+			if err != errNotCopying {
+				fmt.Fprintf(os.Stderr, "(Error copying to clipboard: %v)\n", err)
+			}
+		} else {
+			fmt.Fprintln(os.Stderr, "(Copied to clipboard)")
+		}
 	}
 }
 
@@ -192,7 +214,7 @@ type FileUpload struct {
 
 // Post file to server. Keep retrying if the password is incorrect,
 // otherwise exit with success or other errors.
-func tryPost(conf *Config, upload FileUpload) {
+func tryPost(conf *Config, upload FileUpload) string {
 	if conf.Host == "" {
 		fmt.Fprintln(os.Stderr, "Host not configured.")
 		flag.Usage()
@@ -200,7 +222,6 @@ func tryPost(conf *Config, upload FileUpload) {
 
 	var alreadyWrong bool
 
-authLoop:
 	for {
 		resp := postFile(conf, upload)
 		var msg Resp
@@ -232,21 +253,12 @@ authLoop:
 		case http.StatusCreated:
 			ret := conf.Scheme + "://" + msg.URL
 			fmt.Println(ret)
-			if !*flag_nocopy {
-				if err := copyString(ret); err != nil {
-					if err != errNotCopying {
-						fmt.Fprintf(os.Stderr, "(Error copying to clipboard: %v)\n", err)
-					}
-				} else {
-					fmt.Fprintln(os.Stderr, "(Copied to clipboard)")
-				}
-			}
-			break authLoop
+			return ret
 
 		default:
 			fmt.Fprintln(os.Stderr, resp.Status)
 			fmt.Fprintln(os.Stderr, "Server returned error:", msg.Err)
-			break authLoop
+			return ""
 		}
 	}
 
