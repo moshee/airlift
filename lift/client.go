@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -21,6 +22,8 @@ var (
 	flag_host   = flag.String("h", "", "Set host to upload to")
 	flag_port   = flag.String("p", "", "Set port or interface of remote server to upload to")
 	flag_addr   = flag.String("a", "", "Set whole address of server to upload to")
+	flag_name   = flag.String("f", "", "Specify a different filename to use. If stdin is used, it names the stdin stream")
+	flag_stdin  = flag.Bool("s", false, "Read from stdin")
 	flag_nocopy = flag.Bool("C", false, "Do not copy link to clipboard")
 	flag_noprog = flag.Bool("P", false, "Do not show progress bar")
 	dotfilePath string
@@ -55,15 +58,38 @@ func main() {
 
 	configured := config(conf)
 
-	if len(flag.Args()) < 1 {
+	if flag.NArg() == 0 {
 		if configured {
 			os.Exit(0)
-		} else {
+		}
+		if !*flag_stdin {
 			flag.Usage()
 		}
 	}
 
-	tryPost(conf)
+	if *flag_stdin {
+		tmp, err := ioutil.TempFile("", "airlift-upload")
+		if err != nil {
+			log.Fatal("Failed to buffer stdin:", tmp)
+		}
+		io.Copy(tmp, os.Stdin)
+		tmp.Seek(0, os.SEEK_SET)
+		s := FileUpload{"stdin", tmp}
+		if *flag_name != "" {
+			s.Name = *flag_name
+			*flag_name = ""
+		}
+		tryPost(conf, s)
+	}
+
+	for _, arg := range flag.Args() {
+		file, err := os.Open(arg)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		name := filepath.Base(file.Name())
+		tryPost(conf, FileUpload{name, file})
+	}
 }
 
 type NotAnError int
@@ -159,21 +185,24 @@ func config(conf *Config) bool {
 	return configured
 }
 
+type FileUpload struct {
+	Name    string
+	Content io.ReadCloser
+}
+
 // Post file to server. Keep retrying if the password is incorrect,
 // otherwise exit with success or other errors.
-func tryPost(conf *Config) {
+func tryPost(conf *Config, upload FileUpload) {
 	if conf.Host == "" {
 		fmt.Fprintln(os.Stderr, "Host not configured.")
 		flag.Usage()
 	}
 
-	var (
-		alreadyWrong bool
-	)
+	var alreadyWrong bool
 
 authLoop:
 	for {
-		resp := postFile(conf, flag.Arg(0))
+		resp := postFile(conf, upload)
 		var msg Resp
 		err := json.NewDecoder(resp.Body).Decode(&msg)
 		resp.Body.Close()
@@ -233,7 +262,11 @@ func newProgressReader(r io.ReadCloser, total int64) *ProgressReader {
 		ReadCloser: r,
 		total:      total,
 		width:      getTermWidth(),
-		closed:     make(chan struct{}),
+		read: make(chan struct {
+			n   int
+			err error
+		}, 1),
+		closed: make(chan struct{}),
 	}
 	if p.width >= 3 {
 		p.buf = make([]rune, p.width-2)
@@ -243,20 +276,25 @@ func newProgressReader(r io.ReadCloser, total int64) *ProgressReader {
 
 type ProgressReader struct {
 	io.ReadCloser
-	err     error
 	total   int64
 	current int64
 	width   int
 	buf     []rune
-	closed  chan struct{}
+	read    chan struct {
+		n   int
+		err error
+	}
+	closed chan struct{}
 }
 
 var barChars = []rune{' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉'}
 
 func (r *ProgressReader) Read(p []byte) (n int, err error) {
 	n, err = r.ReadCloser.Read(p)
-	r.current += int64(n)
-	r.err = err
+	r.read <- struct {
+		n   int
+		err error
+	}{n, err}
 	return
 }
 
@@ -277,10 +315,12 @@ func (r *ProgressReader) Report() {
 			r.current = r.total
 			r.output()
 			return
-		case <-t.C:
-			if r.err != nil {
+		case read := <-r.read:
+			if read.err != nil {
 				return
 			}
+			r.current += int64(read.n)
+		case <-t.C:
 			r.output()
 		}
 	}
@@ -305,37 +345,39 @@ func (r *ProgressReader) output() {
 	fmt.Fprint(os.Stderr, "\033[J["+string(r.buf)+"]\n\033[1A")
 }
 
-func postFile(conf *Config, filename string) *http.Response {
-	file, err := os.Open(filename)
-	if err != nil {
-		log.Fatalln(err)
-	}
+func postFile(conf *Config, upload FileUpload) *http.Response {
+	var (
+		sz  int64
+		err error
+	)
 
-	var body io.ReadCloser
-
-	sz, err := file.Seek(0, os.SEEK_END)
-	if err != nil {
-		log.Fatalln(err)
+	if seeker, ok := upload.Content.(io.Seeker); ok {
+		sz, err = seeker.Seek(0, os.SEEK_END)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		seeker.Seek(0, os.SEEK_SET)
 	}
-	file.Seek(0, os.SEEK_SET)
 
 	// only show progress if the size is bigger than some arbitrary amount
 	// (512KiB) and -P isn't set
 	if sz > 512*1024 && !*flag_noprog {
-		r := newProgressReader(file, sz)
-		body = r
-
+		r := newProgressReader(upload.Content, sz)
 		go r.Report()
-	} else {
-		body = file
 	}
 
-	req, err := http.NewRequest("POST", conf.UploadURL(), body)
+	req, err := http.NewRequest("POST", conf.UploadURL(), upload.Content)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	req.Header.Set("X-Airlift-Filename", filepath.Base(os.Args[1]))
+	var name string
+	if *flag_name != "" {
+		name = *flag_name
+	} else {
+		name = upload.Name
+	}
+	req.Header.Set("X-Airlift-Filename", name)
 
 	// attach the password. Only do so if there's a password stored for the
 	// given host.
