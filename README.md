@@ -7,7 +7,8 @@ Windows, and Linux and binary downloads for server coming soon™.
 The client uploads files to the server and returns a nice link for you to
 share. Just bring your own server and domain.
 
-You should use deuiore/load.link instead of this if...
+You should use [deuiore/load.link](https://github.com/deuiore/load.link)
+instead of this if...
 
 - ...you like PHP;
 - ...you don't like me;
