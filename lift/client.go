@@ -264,6 +264,65 @@ func tryPost(conf *Config, upload FileUpload) string {
 
 }
 
+func postFile(conf *Config, upload FileUpload) *http.Response {
+	var (
+		sz  int64
+		err error
+	)
+
+	if seeker, ok := upload.Content.(io.Seeker); ok {
+		sz, err = seeker.Seek(0, os.SEEK_END)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		seeker.Seek(0, os.SEEK_SET)
+	}
+
+	var body io.ReadCloser
+
+	// only show progress if the size is bigger than some arbitrary amount
+	// (512KiB) and -P isn't set
+	if sz > 512*1024 && !*flag_noprog {
+		r := newProgressReader(upload.Content, sz)
+		go r.Report()
+		body = r
+	} else {
+		body = upload.Content
+	}
+
+	req, err := http.NewRequest("POST", conf.UploadURL(), body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	var name string
+	if *flag_name != "" {
+		name = *flag_name
+	} else {
+		name = upload.Name
+	}
+	req.Header.Set("X-Airlift-Filename", name)
+
+	// attach the password. Only do so if there's a password stored for the
+	// given host.
+	pass, err := getPassword(conf)
+	switch err {
+	case nil:
+		req.Header.Set("X-Airlift-Password", pass)
+	case errPassNotFound:
+		break
+	default:
+		log.Fatalln(err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	return resp
+}
+
 type Resp struct {
 	URL string
 	Err string
@@ -277,8 +336,8 @@ func newProgressReader(r io.ReadCloser, total int64) *ProgressReader {
 		read: make(chan struct {
 			n   int
 			err error
-		}, 1),
-		closed: make(chan struct{}),
+		}, 10),
+		closed: make(chan struct{}, 1),
 	}
 	if p.width >= 3 {
 		p.buf = make([]rune, p.width-2)
@@ -319,7 +378,9 @@ func (r *ProgressReader) Report() {
 	if r.buf == nil {
 		return
 	}
-	defer fmt.Fprintln(os.Stderr)
+	defer func() {
+		fmt.Fprint(os.Stdout, "\033[J")
+	}()
 	t := time.NewTicker(33 * time.Millisecond)
 	for {
 		select {
@@ -355,60 +416,6 @@ func (r *ProgressReader) output() {
 		}
 	}
 	fmt.Fprint(os.Stderr, "\033[J["+string(r.buf)+"]\n\033[1A")
-}
-
-func postFile(conf *Config, upload FileUpload) *http.Response {
-	var (
-		sz  int64
-		err error
-	)
-
-	if seeker, ok := upload.Content.(io.Seeker); ok {
-		sz, err = seeker.Seek(0, os.SEEK_END)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		seeker.Seek(0, os.SEEK_SET)
-	}
-
-	// only show progress if the size is bigger than some arbitrary amount
-	// (512KiB) and -P isn't set
-	if sz > 512*1024 && !*flag_noprog {
-		r := newProgressReader(upload.Content, sz)
-		go r.Report()
-	}
-
-	req, err := http.NewRequest("POST", conf.UploadURL(), upload.Content)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	var name string
-	if *flag_name != "" {
-		name = *flag_name
-	} else {
-		name = upload.Name
-	}
-	req.Header.Set("X-Airlift-Filename", name)
-
-	// attach the password. Only do so if there's a password stored for the
-	// given host.
-	pass, err := getPassword(conf)
-	switch err {
-	case nil:
-		req.Header.Set("X-Airlift-Password", pass)
-	case errPassNotFound:
-		break
-	default:
-		log.Fatalln(err)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	return resp
 }
 
 // read a password from stdin, disabling console echo
