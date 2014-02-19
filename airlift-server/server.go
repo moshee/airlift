@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/user"
 	"path"
@@ -73,6 +74,7 @@ func main() {
 		Get("/logout", getLogout).
 		Post("/upload/file", postFile).
 		Post("/upload/meta", postFileMeta).
+		Get("/{id}/{filename}", getFile).
 		Get("/{id}", getFile)
 
 	gas.Ignition(&http.Server{
@@ -289,6 +291,12 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	if !ok {
 		return 404, g.Error(errors.New("ID not found"))
 	}
+
+	if g.Arg("filename") == "" {
+		filename := url.QueryEscape(file)
+		g.Header().Set("Content-Disposition", "filename="+filename)
+	}
+
 	path := filepath.Join(conf.Directory, file)
 	http.ServeFile(g, g.Request, path)
 
