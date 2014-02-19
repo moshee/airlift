@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -132,7 +131,7 @@ func (c *Config) UploadURL() string {
 }
 
 func loadConfig() (*Config, error) {
-	file, err := os.Open(dotfilePath)
+	buf, err := ioutil.ReadFile(dotfilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			conf := &Config{
@@ -143,11 +142,8 @@ func loadConfig() (*Config, error) {
 		}
 		return nil, err
 	}
-	defer file.Close()
 	conf := new(Config)
-	b := new(bytes.Buffer)
-	io.Copy(b, file)
-	if err := json.Unmarshal(b.Bytes(), conf); err != nil {
+	if err := json.Unmarshal(buf, conf); err != nil {
 		return nil, fmt.Errorf("Error reading config: %v", err)
 	}
 	return conf, nil
@@ -429,12 +425,8 @@ func (r *ProgressReader) output() {
 
 // read a password from stdin, disabling console echo
 func readPassword() (string, error) {
-	/*
-		if err := toggleEcho(false); err != nil {
-			return "", err
-		}
-	*/
 	toggleEcho(false)
+
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
 	s := scanner.Text()
@@ -443,11 +435,6 @@ func readPassword() (string, error) {
 		return "", err
 	}
 
-	/*
-		if err := toggleEcho(true); err != nil {
-			return "", err
-		}
-	*/
 	toggleEcho(true)
 	return s, nil
 }
