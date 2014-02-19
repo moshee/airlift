@@ -235,7 +235,7 @@ authLoop:
 			if !*flag_nocopy {
 				if err := copyString(ret); err != nil {
 					if err != errNotCopying {
-						fmt.Fprintln(os.Stderr, "(Error copying to clipboard: %v)\n", err)
+						fmt.Fprintf(os.Stderr, "(Error copying to clipboard: %v)\n", err)
 					}
 				} else {
 					fmt.Fprintln(os.Stderr, "(Copied to clipboard)")
