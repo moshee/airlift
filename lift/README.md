@@ -11,7 +11,7 @@ saved in a secure system-dependent fashion:
 
 - **OS X**: Keychain
 - **Windows**: encrypted in conf file using current user info
-- **Linux**: ??? (probably 3DES)
+- **Linux**: I'm not really sure so I just used Twofish
 
 ### Installing
 
