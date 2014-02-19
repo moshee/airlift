@@ -179,6 +179,9 @@ func config(conf *Config) bool {
 	}
 	if *flag_addr != "" {
 		configured = true
+		if !strings.Contains(*flag_addr, "://") {
+			*flag_addr = "http://" + *flag_addr
+		}
 		addr, err := url.Parse(*flag_addr)
 		if err != nil {
 			log.Fatalln("-a:", err)
