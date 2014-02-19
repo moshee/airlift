@@ -20,14 +20,15 @@ import (
 )
 
 var (
-	flag_host   = flag.String("h", "", "Set host to upload to")
-	flag_port   = flag.String("p", "", "Set port or interface of remote server to upload to")
-	flag_addr   = flag.String("a", "", "Set whole address of server to upload to")
-	flag_name   = flag.String("f", "", "Specify a different filename to use. If stdin is used, it names the stdin stream")
-	flag_stdin  = flag.Bool("s", false, "Read from stdin")
-	flag_nocopy = flag.Bool("C", false, "Do not copy link to clipboard")
-	flag_noprog = flag.Bool("P", false, "Do not show progress bar")
-	dotfilePath string
+	flag_host     = flag.String("h", "", "Set host to upload to")
+	flag_port     = flag.String("p", "", "Set port or interface of remote server to upload to")
+	flag_addr     = flag.String("a", "", "Set whole address of server to upload to")
+	flag_name     = flag.String("f", "", "Specify a different filename to use. If stdin is used, it names the stdin stream")
+	flag_inclname = flag.Bool("n", false, "Include filename in returned URL")
+	flag_stdin    = flag.Bool("s", false, "Read from stdin")
+	flag_nocopy   = flag.Bool("C", false, "Do not copy link to clipboard")
+	flag_noprog   = flag.Bool("P", false, "Do not show progress bar")
+	dotfilePath   string
 )
 
 func init() {
@@ -68,7 +69,7 @@ func main() {
 		}
 	}
 
-	urls := make([]string, 0, flag.NArg()+1)
+	uploads := make([]FileUpload, 0, flag.NArg()+1)
 
 	if *flag_stdin {
 		tmp, err := ioutil.TempFile("", "airlift-upload")
@@ -82,11 +83,7 @@ func main() {
 			s.Name = *flag_name
 			*flag_name = ""
 		}
-		u := tryPost(conf, s)
-		if u == "" {
-			return
-		}
-		urls = append(urls, u)
+		uploads = append(uploads, s)
 	}
 
 	for _, arg := range flag.Args() {
@@ -95,7 +92,12 @@ func main() {
 			log.Fatalln(err)
 		}
 		name := filepath.Base(file.Name())
-		u := tryPost(conf, FileUpload{name, file})
+		uploads = append(uploads, FileUpload{name, file})
+	}
+
+	urls := make([]string, 0, flag.NArg()+1)
+	for _, upload := range uploads {
+		u := tryPost(conf, upload)
 		if u == "" {
 			return
 		}
@@ -254,9 +256,13 @@ func tryPost(conf *Config, upload FileUpload) string {
 			}
 
 		case http.StatusCreated:
-			ret := conf.Scheme + "://" + msg.URL
-			fmt.Println(ret)
-			return ret
+			u := msg.URL
+			if *flag_inclname {
+				u = path.Join(u, upload.Name)
+			}
+			u = conf.Scheme + "://" + u
+			fmt.Println(u)
+			return u
 
 		default:
 			fmt.Fprintln(os.Stderr, resp.Status)
