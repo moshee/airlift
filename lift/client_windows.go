@@ -1,89 +1,7 @@
 package main
 
-/*
-#cgo LDFLAGS: -lcrypt32
-#include "Windows.h"
-#include "Wincrypt.h"
-#include <stdio.h>
-#include <string.h>
-
-char* geterror(const char* sender) {
-	DWORD code = GetLastError();
-	char* msg;
-	DWORD n = FormatMessage(
-		FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL, code, 0, (LPSTR)&msg, 0, NULL);
-
-	char* buf = (char*)malloc((size_t)n + strlen(sender) + 3);
-	sprintf(buf, "%s: %s", sender, msg);
-	return buf;
-}
-
-int GetTermWidth() {
-	HANDLE hConsole = CreateConsoleScreenBuffer(
-		GENERIC_READ|GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
-	CONSOLE_SCREEN_BUFFER_INFO info;
-	BOOL ok = GetConsoleScreenBufferInfo(hConsole, &info);
-	if (!ok) {
-		return -1;
-	}
-
-	return (int)info.dwSize.X;
-}
-
-char* CopyString(size_t len, const char* str) {
-	if (!OpenClipboard(NULL)) {
-		return geterror("CopyString");
-	}
-
-	// overestimate number of wide chars as number of bytes
-	size_t wlen = len*sizeof(wchar_t) + 1;
-
-	// alloc and lock global memory
-	HGLOBAL hMem = GlobalAlloc(GMEM_SHARE | GMEM_MOVEABLE, wlen);
-	LPTSTR glob = (LPTSTR)GlobalLock(hMem);
-
-	// copy our UTF-8 text into a wchar string stored in the global handle
-	mbstowcs_s(NULL, glob, wlen, str, len);
-
-	GlobalUnlock(hMem);
-
-	if (!SetClipboardData(CF_UNICODETEXT, hMem)) {
-		return geterror("SetClipboardData");
-	}
-
-	if (!CloseClipboard()) {
-		return geterror("CloseClipboard");
-	}
-
-	return NULL;
-}
-
-char* CryptPassword(const char* str, int inSize, void** out, int* outSize, int encrypt) {
-	DATA_BLOB input, output;
-	input.cbData = (DWORD)inSize + 1;
-	input.pbData = (BYTE*)str;
-
-	BOOL ok;
-	if (encrypt) {
-		ok = CryptProtectData(&input, NULL, NULL, NULL, NULL, 0, &output);
-		if (!ok) {
-			return geterror("CryptProtectData");
-		}
-	} else {
-		ok = CryptUnprotectData(&input, NULL, NULL, NULL, NULL, 0, &output);
-		if (!ok) {
-			return geterror("CryptUnprotectData");
-		}
-	}
-
-
-	*out = output.pbData;
-	*outSize = output.cbData;
-
-	return NULL;
-}
-*/
+// #cgo LDFLAGS: -lcrypt32
+// #include "client_windows.h"
 import "C"
 import (
 	"errors"
@@ -115,10 +33,6 @@ const (
 )
 
 var SetConsoleMode = syscall.MustLoadDLL("Kernel32.dll").MustFindProc("SetConsoleMode")
-
-func getTermWidth() int {
-	return int(C.GetTermWidth())
-}
 
 func toggleEcho(t bool) error {
 	stdin, err := syscall.GetStdHandle(syscall.STD_INPUT_HANDLE)
@@ -180,4 +94,34 @@ func copyString(s string) error {
 		return nil
 	}
 	return errors.New(err)
+}
+
+func getTermWidth() int {
+	var c C.CONSOLE_SCREEN_BUFFER_INFO
+	C.GetTermInfo(&c)
+	w := int(c.dwSize.X)
+
+	// if we're not actually on a windows console, GetConsoleScreenBufferInfo
+	// will fail and the width will be 0. In that case, just pick 80 since
+	// there's no way I can think of to alternatively find the width without
+	// shelling out.
+	if w == 0 {
+		w = 80
+	}
+	return w
+}
+
+func termClearLine() {
+	// clearing line for cygwin
+	os.Stderr.WriteString("\033[J")
+	// this will remove the junk characters above in the windows console (noop
+	// for cygwin)
+	C.ClearLine()
+}
+
+func termReturn0() {
+	// move down (reset cursor to x = 0) and then up for cygwin
+	os.Stderr.WriteString("\n\033[A")
+	C.ClearLine() // remove junk
+	C.MoveUp()    // move up for windows console (noop for cygwin)
 }

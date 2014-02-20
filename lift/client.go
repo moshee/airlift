@@ -381,11 +381,10 @@ func (r *ProgressReader) Close() error {
 
 func (r *ProgressReader) Report() {
 	if r.buf == nil {
+		<-r.closed
 		return
 	}
-	defer func() {
-		fmt.Fprint(os.Stdout, "\033[J")
-	}()
+	defer termClearLine()
 	t := time.NewTicker(33 * time.Millisecond)
 	for {
 		select {
@@ -420,7 +419,9 @@ func (r *ProgressReader) output() {
 			r.buf[i] = ch
 		}
 	}
-	fmt.Fprint(os.Stderr, "\033[J["+string(r.buf)+"]\n\033[1A")
+	//termClearLine()
+	os.Stderr.WriteString("[" + string(r.buf) + "]")
+	termReturn0()
 }
 
 // read a password from stdin, disabling console echo

@@ -27,7 +27,9 @@ int get_term_width(void) {
 import "C"
 
 import (
+	"fmt"
 	"log"
+	"os"
 	"os/user"
 	"path/filepath"
 )
@@ -51,4 +53,16 @@ func toggleEcho(t bool) error {
 
 func getTermWidth() int {
 	return int(C.get_term_width())
+}
+
+func termClearLine() {
+	os.Stderr.WriteString("\033[J")
+}
+
+func termMoveUp() {
+	fmt.Print(os.Stderr, "\033[A")
+}
+
+func termReturn0() {
+	os.Stderr.WriteString("\n\033[A")
 }
