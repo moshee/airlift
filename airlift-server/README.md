@@ -14,12 +14,25 @@ doesn't support SSL/TLS standalone, but it's planned.
 
 ### Installing
 
-Binaries for common platforms will be coming soon™. To build,
+Binaries for common platforms will be coming soon™.
 
-1. [Install Go](http://golang.org/doc/install)
-2. `$ cd /path/to/airlift-server`
-3. `$ go get github.com/moshee/gas`
-4. `$ go build`
+#### Building
+
+Before you build, if you have not already:
+
+1. [Install Go](http://golang.org/doc/install), git, and mercurial (if you
+   haven't already)
+2. `$ mkdir ~/go && export GOPATH=~/go` (you can use any place as your GOPATH)
+
+Then,
+
+1. `$ go get -u -d github.com/moshee/airlift/airlift-server`
+2. `$ cd $GOPATH/src/github.com/moshee/airlift/airlift-server`
+3. `$ go build`
+
+`go get` should clone this repo along with any dependencies and place it
+in your `$GOPATH`. The binary produced by `go build` will be in your working
+directory at the moment you built it.
 
 I haven't tried to build or run it on Windows, YMMV. Works on OS X and
 GNU+Linux.
