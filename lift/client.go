@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bufio"
 	"encoding/json"
 	"flag"
@@ -22,7 +23,8 @@ var (
 	flag_host     = flag.String("h", "", "Set host to upload to")
 	flag_port     = flag.String("p", "", "Set port or interface of remote server to upload to")
 	flag_addr     = flag.String("a", "", "Set whole address of server to upload to")
-	flag_name     = flag.String("f", "", "Specify a different filename to use. If stdin is used, it names the stdin stream")
+	flag_name     = flag.String("f", "", "Specify a different filename to use. If -s is used, it names the stdin stream")
+	flag_zip      = flag.Bool("z", false, "Upload the input file(s) (and stdin) as a single zip file")
 	flag_inclname = flag.Bool("n", false, "Include filename in returned URL")
 	flag_stdin    = flag.Bool("s", false, "Read from stdin")
 	flag_nocopy   = flag.Bool("C", false, "Do not copy link to clipboard")
@@ -75,13 +77,13 @@ func main() {
 		if err != nil {
 			log.Fatal("Failed to buffer stdin:", tmp)
 		}
+
+		defer os.Remove(tmp.Name())
+		defer tmp.Close()
+
 		io.Copy(tmp, os.Stdin)
 		tmp.Seek(0, os.SEEK_SET)
 		s := FileUpload{"stdin", tmp}
-		if *flag_name != "" {
-			s.Name = *flag_name
-			*flag_name = ""
-		}
 		uploads = append(uploads, s)
 	}
 
@@ -90,11 +92,23 @@ func main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		name := filepath.Base(file.Name())
+		//name := filepath.Base(file.Name())
+		name := file.Name()
 		uploads = append(uploads, FileUpload{name, file})
 	}
 
-	urls := make([]string, 0, flag.NArg()+1)
+	if *flag_zip {
+		// if we are making a zip file, it will be named by -n
+		uploads = []FileUpload{makeZip(uploads, *flag_name)}
+	} else {
+		// otherwise the first file (stdin if it exists) will be named by -n
+		if *flag_name != "" {
+			uploads[0].Name = *flag_name
+			*flag_name = ""
+		}
+	}
+
+	urls := make([]string, 0, len(uploads))
 	for _, upload := range uploads {
 		u := tryPost(conf, upload)
 		if u == "" {
@@ -300,12 +314,7 @@ func postFile(conf *Config, upload FileUpload) *http.Response {
 		log.Fatalln(err)
 	}
 
-	var name string
-	if *flag_name != "" {
-		name = *flag_name
-	} else {
-		name = upload.Name
-	}
+	name := filepath.Base(upload.Name)
 	req.Header.Set("X-Airlift-Filename", name)
 
 	// attach the password. Only do so if there's a password stored for the
@@ -406,7 +415,7 @@ func (r *ProgressReader) Report() {
 func (r *ProgressReader) output() {
 	last := barChars[len(barChars)-1]
 	progress := float64(r.current) / float64(r.total)
-	q := float64(r.width-2)*progress + 1
+	q := float64(r.width-1) * progress
 	x := int(q)
 	frac := barChars[int((q-float64(x))*float64(len(barChars)))]
 
@@ -438,4 +447,76 @@ func readPassword() (string, error) {
 
 	toggleEcho(true)
 	return s, nil
+}
+
+// Write a zip file with the contents of each FileUpload and return a new
+// FileUpload containing the zip file. All files will be placed in the root of
+// the zip archive (there will be no directories).
+func makeZip(uploads []FileUpload, name string) FileUpload {
+	if len(uploads) == 0 {
+		log.Fatalln("makeZip: no uploads to operate on")
+	}
+	if name == "" {
+		name = "upload.zip"
+	}
+	name = filepath.Join(os.TempDir(), name)
+
+	file, err := os.OpenFile(name, os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.FileMode(0600))
+	if err != nil {
+		log.Fatalln("makeZip:", err)
+	}
+
+	done := make(chan struct{}, 1)
+	go func(done chan struct{}) {
+		chars := []rune("▖▙▚▜▝▘▛▞▟▗")
+		t := time.NewTicker(33 * time.Millisecond)
+		for i := 0; ; i = (i + 1) % len(chars) {
+			select {
+			case <-done:
+				fmt.Print("\033[D\033[J")
+				return
+			case <-t.C:
+				fmt.Printf("\033[D%c", chars[i])
+			}
+		}
+	}(done)
+
+	z := zip.NewWriter(file)
+	now := time.Now()
+
+	for _, upload := range uploads {
+		var (
+			fh  *zip.FileHeader
+			err error
+		)
+		if ulFile, ok := upload.Content.(*os.File); ok {
+			fi, err := ulFile.Stat()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			fh, err = zip.FileInfoHeader(fi)
+			if err != nil {
+				log.Fatalln(err)
+			}
+		} else {
+			fh = &zip.FileHeader{
+				Method: zip.Deflate,
+			}
+			fh.SetModTime(now)
+			fh.SetMode(os.FileMode(0644))
+		}
+		fh.Name = upload.Name
+		w, err := z.CreateHeader(fh)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		io.Copy(w, upload.Content)
+		upload.Content.Close()
+	}
+	z.Close()
+
+	done <- struct{}{}
+
+	file.Seek(0, os.SEEK_SET)
+	return FileUpload{name, file}
 }
