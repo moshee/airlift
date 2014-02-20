@@ -293,7 +293,7 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	}
 
 	if g.Arg("filename") == "" {
-		filename := url.QueryEscape(file)
+		filename := url.QueryEscape(strings.Split(file, ".")[1])
 		g.Header().Set("Content-Disposition", "filename="+filename)
 	}
 
