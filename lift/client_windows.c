@@ -12,20 +12,21 @@ char* geterror(const char* sender) {
 	return buf;
 }
 
-char* CopyString(size_t len, const char* str) {
+char* CopyString(const char* str) {
 	if (!OpenClipboard(NULL)) {
 		return geterror("CopyString");
 	}
 
 	// overestimate number of wide chars as number of bytes
-	size_t wlen = len*sizeof(wchar_t) + 1;
+	size_t wlen = strlen(str) + 1;
 
 	// alloc and lock global memory
-	HGLOBAL hMem = GlobalAlloc(GMEM_SHARE | GMEM_MOVEABLE, wlen);
+	HGLOBAL hMem = GlobalAlloc(GMEM_SHARE | GMEM_MOVEABLE, wlen * sizeof(wchar_t));
 	LPTSTR glob = (LPTSTR)GlobalLock(hMem);
 
 	// copy our UTF-8 text into a wchar string stored in the global handle
-	mbstowcs_s(NULL, glob, wlen, str, len);
+	size_t nConverted = 0;
+	mbstowcs_s(&nConverted, glob, wlen, str, _TRUNCATE);
 
 	GlobalUnlock(hMem);
 

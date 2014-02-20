@@ -89,7 +89,7 @@ func getPassword(conf *Config) (string, error) {
 }
 
 func copyString(s string) error {
-	err := C.GoString(C.CopyString(C.size_t(len(s)), C.CString(s)))
+	err := C.GoString(C.CopyString(C.CString(s)))
 	if err == "" {
 		return nil
 	}
