@@ -31,16 +31,24 @@ var (
 		sync.RWMutex
 	}
 	defaultConfig = Config{
-		Host:      "",
-		Port:      60606,
-		Password:  "",
-		Directory: getAppDir("uploads"),
+		Host:     "",
+		Port:     60606,
+		Password: "",
 	}
 	configLock sync.RWMutex
 )
 
+func init() {
+	u, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+	appDir = filepath.Join(u.HomeDir, ".airlift-server")
+	defaultConfig.Directory = filepath.Join(appDir, "uploads")
+}
+
 func main() {
-	sessDir := getAppDir("sessions")
+	sessDir := filepath.Join(appDir, "sessions")
 	os.RemoveAll(sessDir)
 	store := &gas.FileStore{Root: sessDir}
 	defer store.Destroy()
@@ -115,17 +123,7 @@ func makePass(pass string) string {
 	return fmt.Sprintf("%x$%x", hash, salt)
 }
 
-func getAppDir(more ...string) string {
-	u, err := user.Current()
-	if err != nil {
-		return ""
-	}
-
-	return filepath.Join(append([]string{u.HomeDir, ".airlift-server"}, more...)...)
-}
-
 func loadConfig() (*Config, error) {
-	appDir := getAppDir()
 	if err := os.MkdirAll(appDir, os.FileMode(0755)); err != nil {
 		return nil, err
 	}
@@ -228,7 +226,7 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	}
 	conf.Port = port
 
-	path := getAppDir("config")
+	path := filepath.Join(appDir, "config")
 	err = writeConfig(&conf, path)
 	if err != nil {
 		return 500, gas.JSON(&Error{err.Error()})
