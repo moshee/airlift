@@ -23,10 +23,10 @@ var (
 	flag_host     = flag.String("h", "", "Set host to upload to")
 	flag_port     = flag.String("p", "", "Set port or interface of remote server to upload to")
 	flag_addr     = flag.String("a", "", "Set whole address of server to upload to")
-	flag_name     = flag.String("f", "", "Specify a different filename to use. If -s is used, it names the stdin stream")
+	flag_name     = flag.String("f", "", "Specify a different filename to use. If -z, it names the zip archive")
+	flag_stdin    = flag.String("s", "", "Give stdin stream a filename")
 	flag_zip      = flag.Bool("z", false, "Upload the input file(s) (and stdin) as a single zip file")
 	flag_inclname = flag.Bool("n", false, "Include filename in returned URL")
-	flag_stdin    = flag.Bool("s", false, "Read from stdin")
 	flag_nocopy   = flag.Bool("C", false, "Do not copy link to clipboard")
 	flag_noprog   = flag.Bool("P", false, "Do not show progress bar")
 	dotfilePath   string
@@ -35,12 +35,14 @@ var (
 func init() {
 	log.SetFlags(log.Lshortfile)
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, `usage: lift [options] <filename>
+		fmt.Fprintln(os.Stderr, `usage: lift [options] [ - | files... ]
 Options:`)
 
 		flag.PrintDefaults()
 
-		fmt.Fprintln(os.Stderr, `Optional parameters specify the connection details to the remote server. -a
+		fmt.Fprintln(os.Stderr, `Pass '-' as a filename to include stdin as an upload.
+		
+Optional parameters specify the connection details to the remote server. -a
 sets the entire URL, including scheme (and optional port), and overrides -h and
 -p.
 
@@ -65,47 +67,48 @@ func main() {
 		if configured {
 			os.Exit(0)
 		}
-		if !*flag_stdin {
-			flag.Usage()
-		}
+		flag.Usage()
 	}
 
 	uploads := make([]FileUpload, 0, flag.NArg()+1)
 
-	if *flag_stdin {
-		tmp, err := ioutil.TempFile("", "airlift-upload")
-		if err != nil {
-			log.Fatal("Failed to buffer stdin:", tmp)
-		}
-
-		defer os.Remove(tmp.Name())
-		defer tmp.Close()
-
-		io.Copy(tmp, os.Stdin)
-		tmp.Seek(0, os.SEEK_SET)
-		s := FileUpload{"stdin", tmp}
-		uploads = append(uploads, s)
-	}
-
 	for _, arg := range flag.Args() {
-		file, err := os.Open(arg)
-		if err != nil {
-			log.Fatalln(err)
+		if arg == "-" {
+			tmp, err := ioutil.TempFile("", "airlift-upload")
+			if err != nil {
+				log.Fatal("Failed to buffer stdin:", tmp)
+			}
+
+			defer os.Remove(tmp.Name())
+			defer tmp.Close()
+
+			io.Copy(tmp, os.Stdin)
+			tmp.Seek(0, os.SEEK_SET)
+
+			s := FileUpload{"stdin", tmp}
+			if *flag_stdin != "" {
+				s.Name = *flag_stdin
+			}
+
+			uploads = append(uploads, s)
+		} else {
+			file, err := os.Open(arg)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			//name := filepath.Base(file.Name())
+			name := file.Name()
+			uploads = append(uploads, FileUpload{name, file})
 		}
-		//name := filepath.Base(file.Name())
-		name := file.Name()
-		uploads = append(uploads, FileUpload{name, file})
 	}
 
 	if *flag_zip {
-		// if we are making a zip file, it will be named by -n
-		uploads = []FileUpload{makeZip(uploads, *flag_name)}
-	} else {
-		// otherwise the first file (stdin if it exists) will be named by -n
-		if *flag_name != "" {
-			uploads[0].Name = *flag_name
-			*flag_name = ""
-		}
+		uploads = []FileUpload{makeZip(uploads)}
+	}
+
+	// -f will simply rename the first file, whatever it is
+	if *flag_name != "" {
+		uploads[0].Name = *flag_name
 	}
 
 	urls := make([]string, 0, len(uploads))
@@ -268,7 +271,7 @@ func tryPost(conf *Config, upload FileUpload) string {
 		case http.StatusCreated:
 			u := msg.URL
 			if *flag_inclname {
-				u = path.Join(u, upload.Name)
+				u = path.Join(u, filepath.Base(upload.Name))
 			}
 			u = conf.Scheme + "://" + u
 			fmt.Println(u)
@@ -452,16 +455,12 @@ func readPassword() (string, error) {
 // Write a zip file with the contents of each FileUpload and return a new
 // FileUpload containing the zip file. All files will be placed in the root of
 // the zip archive (there will be no directories).
-func makeZip(uploads []FileUpload, name string) FileUpload {
+func makeZip(uploads []FileUpload) FileUpload {
 	if len(uploads) == 0 {
 		log.Fatalln("makeZip: no uploads to operate on")
 	}
-	if name == "" {
-		name = "upload.zip"
-	}
-	name = filepath.Join(os.TempDir(), name)
+	tmp, err := ioutil.TempFile("", "airlift-upload")
 
-	file, err := os.OpenFile(name, os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.FileMode(0600))
 	if err != nil {
 		log.Fatalln("makeZip:", err)
 	}
@@ -481,7 +480,7 @@ func makeZip(uploads []FileUpload, name string) FileUpload {
 		}
 	}(done)
 
-	z := zip.NewWriter(file)
+	z := zip.NewWriter(tmp)
 	now := time.Now()
 
 	for _, upload := range uploads {
@@ -517,6 +516,6 @@ func makeZip(uploads []FileUpload, name string) FileUpload {
 
 	done <- struct{}{}
 
-	file.Seek(0, os.SEEK_SET)
-	return FileUpload{name, file}
+	tmp.Seek(0, os.SEEK_SET)
+	return FileUpload{"upload.zip", tmp}
 }
