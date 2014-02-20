@@ -416,7 +416,7 @@ func (r *ProgressReader) Report() {
 func (r *ProgressReader) output() {
 	last := barChars[len(barChars)-1]
 	progress := float64(r.current) / float64(r.total)
-	q := float64(r.width-2)*progress + 1
+	q := float64(r.width-1) * progress
 	x := int(q)
 	frac := barChars[int((q-float64(x))*float64(len(barChars)))]
 
@@ -465,7 +465,7 @@ func makeZip(uploads []FileUpload, name string) FileUpload {
 		log.Fatalln("makeZip:", err)
 	}
 
-	done := make(chan struct{})
+	done := make(chan struct{}, 1)
 	go func(done chan struct{}) {
 		chars := []rune("▖▙▚▜▝▘▛▞▟▗")
 		t := time.NewTicker(33 * time.Millisecond)
