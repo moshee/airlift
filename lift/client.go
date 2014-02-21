@@ -452,6 +452,21 @@ func readPassword() (string, error) {
 	return s, nil
 }
 
+func spinner(done chan struct{}) {
+	chars := []rune("▖▙▚▜▝▘▛▞▟▗")
+	t := time.NewTicker(33 * time.Millisecond)
+	for i := 0; ; i = (i + 1) % len(chars) {
+		select {
+		case <-done:
+			termClearLine()
+			return
+		case <-t.C:
+			fmt.Fprintf(os.Stderr, " %c", chars[i])
+			termReturn0()
+		}
+	}
+}
+
 // Write a zip file with the contents of each FileUpload and return a new
 // FileUpload containing the zip file. All files will be placed in the root of
 // the zip archive (there will be no directories).
@@ -466,19 +481,7 @@ func makeZip(uploads []FileUpload) FileUpload {
 	}
 
 	done := make(chan struct{}, 1)
-	go func(done chan struct{}) {
-		chars := []rune("▖▙▚▜▝▘▛▞▟▗")
-		t := time.NewTicker(33 * time.Millisecond)
-		for i := 0; ; i = (i + 1) % len(chars) {
-			select {
-			case <-done:
-				fmt.Print("\033[D\033[J")
-				return
-			case <-t.C:
-				fmt.Printf("\033[D%c", chars[i])
-			}
-		}
-	}(done)
+	go spinner(done)
 
 	z := zip.NewWriter(tmp)
 	now := time.Now()
