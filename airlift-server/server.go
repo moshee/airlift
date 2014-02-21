@@ -62,7 +62,7 @@ func main() {
 
 	// make sure the uploads folder is there, and then load all of the file
 	// names and IDs into memory
-	os.MkdirAll(conf.Directory, os.FileMode(0755))
+	os.MkdirAll(conf.Directory, os.FileMode(0700))
 	files.Files = make(map[string]string)
 	list, err := ioutil.ReadDir(conf.Directory)
 	if err != nil {
@@ -124,7 +124,7 @@ func makePass(pass string) string {
 }
 
 func loadConfig() (*Config, error) {
-	if err := os.MkdirAll(appDir, os.FileMode(0755)); err != nil {
+	if err := os.MkdirAll(appDir, os.FileMode(0700)); err != nil {
 		return nil, err
 	}
 	var conf Config
