@@ -27,6 +27,7 @@
   <script>
     function $(sel) { return document.querySelector(sel); }
     function $$(sel) { return document.querySelectorAll(sel); }
+    var timeout;
 
     window.addEventListener('load', function() {
       var buttons = $$('button');
@@ -53,6 +54,8 @@
               showMessage('An unknown error occurred (status ' + e.target.status + ')', 'bad');
             }
           }
+          if (timeout != null) window.clearTimeout(timeout);
+          timeout = window.setTimeout(hideMessage, 5000);
         }, false);
 
         x.open('POST', '/config', true);
@@ -61,14 +64,19 @@
     }, false);
 
     function showMessage(msg, classname) {
-      var box = document.querySelector('#message-box');
+      var box = $('#message-box');
       if (box == null) {
         box = document.createElement('div');
         box.id = 'message-box';
-        document.body.insertBefore(box, document.querySelector('#config'));
+        document.body.insertBefore(box, $('#config'));
       }
       box.className = classname;
       box.innerText = msg;
+      box.style.display = 'block';
+    }
+
+    function hideMessage() {
+      $('#message-box').style.display = 'none';
     }
   </script>
 {{ end }}
