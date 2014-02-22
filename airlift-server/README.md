@@ -53,6 +53,9 @@ are:
 -------|-----------|----------------------------------------------
  Host  | (empty)   | Leaving the host field empty will cause the server to return whatever host the file was posted to.
  Port  | 60606     | This is the port the server executable listens on. If you are using e.g. nginx, you can just add a `proxy_pass http://localhost:60606` directive inside a server block for the host you choose.
- Directory | ~/(you)/.airlift-server/uploads | This is where uploaded files will be stored.
+ Directory | ~/.airlift-server/uploads | This is where uploaded files will be stored.
 
 You may have to restart the server after modifying the configuration.
+
+If the server fails to start with a config error, you probably want to delete
+`~/.airlift-server/config` and reconfigure from scratch.
