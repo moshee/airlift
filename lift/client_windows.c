@@ -17,16 +17,15 @@ char* CopyString(const char* str) {
 		return geterror("CopyString");
 	}
 
-	// overestimate number of wide chars as number of bytes
-	size_t wlen = strlen(str) + 1;
+	// copy our UTF-8 text into a wchar string stored in the global handle
+	size_t n = 0;
+	mbstowcs_s(&n, NULL, 0, str, 0);
 
 	// alloc and lock global memory
-	HGLOBAL hMem = GlobalAlloc(GMEM_SHARE | GMEM_MOVEABLE, wlen * sizeof(wchar_t));
+	HGLOBAL hMem = GlobalAlloc(GMEM_SHARE | GMEM_MOVEABLE, n*sizeof(wchar_t) + 1);
 	LPTSTR glob = (LPTSTR)GlobalLock(hMem);
 
-	// copy our UTF-8 text into a wchar string stored in the global handle
-	size_t nConverted = 0;
-	mbstowcs_s(&nConverted, glob, wlen, str, _TRUNCATE);
+	mbstowcs_s(&n, glob, n + 1, str, n);
 
 	GlobalUnlock(hMem);
 
