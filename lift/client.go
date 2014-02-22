@@ -245,8 +245,12 @@ func tryPost(conf *Config, upload FileUpload) string {
 		var msg Resp
 		err := json.NewDecoder(resp.Body).Decode(&msg)
 		resp.Body.Close()
+
+		if resp.StatusCode != http.StatusCreated {
+			fmt.Fprintln(os.Stderr, resp.Status)
+		}
 		if err != nil {
-			log.Fatalln("error decoding server response:", err)
+			log.Fatalln("Invalid server response:", err)
 		}
 
 		switch resp.StatusCode {
@@ -278,7 +282,6 @@ func tryPost(conf *Config, upload FileUpload) string {
 			return u
 
 		default:
-			fmt.Fprintln(os.Stderr, resp.Status)
 			fmt.Fprintln(os.Stderr, "Server returned error:", msg.Err)
 			return ""
 		}
