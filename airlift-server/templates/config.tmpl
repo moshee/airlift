@@ -16,7 +16,7 @@
       <label for="password">New password</label>
       <input type="password" id="password" name="password">
     </div>
-    <div id="oldpass-box" title="Whatever changes you make, enter your current password here to make sure that you're you.">
+    <div id="oldpass-box" title="Whatever changes you make, enter your current password here to make sure that you're you. If you haven't set a password yet, though, you don't have to fill it out.">
       <label for="oldpass">Current password</label>
       <input type="password" id="oldpass" name="oldpass" required placeholder="Required">
     </div>
@@ -27,6 +27,7 @@
   <script>
     function $(sel) { return document.querySelector(sel); }
     function $$(sel) { return document.querySelectorAll(sel); }
+    var timeout;
 
     window.addEventListener('load', function() {
       var buttons = $$('button');
@@ -45,8 +46,10 @@
           if (e.target.status === 204) {
             showMessage('Configuration updated.', 'good');
             $('#password').value = '';
+            if (timeout != null) window.clearTimeout(timeout);
+            timeout = window.setTimeout(hideMessage, 5000);
           } else {
-            var resp = JSON.parse(e.target.responseText);
+            var resp = x.response;
             if (resp != null && resp.Err != null) {
               showMessage('Error: ' + resp.Err, 'bad');
             } else {
@@ -61,14 +64,19 @@
     }, false);
 
     function showMessage(msg, classname) {
-      var box = document.querySelector('#message-box');
+      var box = $('#message-box');
       if (box == null) {
         box = document.createElement('div');
         box.id = 'message-box';
-        document.body.insertBefore(box, document.querySelector('#config'));
+        document.body.insertBefore(box, $('#config'));
       }
       box.className = classname;
       box.innerText = msg;
+      box.style.display = 'block';
+    }
+
+    function hideMessage() {
+      $('#message-box').style.display = 'none';
     }
   </script>
 {{ end }}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,9 +30,8 @@ var (
 		sync.RWMutex
 	}
 	defaultConfig = Config{
-		Host:     "",
-		Port:     60606,
-		Password: "",
+		Host: "",
+		Port: 60606,
 	}
 	configLock sync.RWMutex
 )
@@ -62,7 +60,7 @@ func main() {
 
 	// make sure the uploads folder is there, and then load all of the file
 	// names and IDs into memory
-	os.MkdirAll(conf.Directory, os.FileMode(0755))
+	os.MkdirAll(conf.Directory, os.FileMode(0700))
 	files.Files = make(map[string]string)
 	list, err := ioutil.ReadDir(conf.Directory)
 	if err != nil {
@@ -81,7 +79,6 @@ func main() {
 		Post("/login", postLogin).
 		Get("/logout", getLogout).
 		Post("/upload/file", postFile).
-		Post("/upload/meta", postFileMeta).
 		Get("/{id}/{filename}", getFile).
 		Get("/{id}", getFile)
 
@@ -93,38 +90,29 @@ func main() {
 type Config struct {
 	Host      string
 	Port      int
-	Password  string // hash$salt
+	Password  []byte
+	Salt      []byte
 	Directory string
 }
 
+// satisfies gas.User interface
 func (c Config) Secrets() (pass, salt []byte, err error) {
-	if c.Password == "" {
-		return
-	}
-
-	parts := strings.SplitN(c.Password, "$", 2)
-	pass, err = hex.DecodeString(parts[0])
-	if err != nil {
-		return
-	}
-	salt, err = hex.DecodeString(parts[1])
-	return
+	return c.Password, c.Salt, nil
 }
 
 func (c Config) Username() string {
 	return ""
 }
 
-// hash a password, generating a random salt, and return an ASCII representation
-func makePass(pass string) string {
-	salt := make([]byte, 32)
-	rand.Read(salt)
-	hash := gas.Hash([]byte(pass), salt)
-	return fmt.Sprintf("%x$%x", hash, salt)
+// Update the config with the new password hash, generating a new random salt
+func (c *Config) setPass(pass string) {
+	c.Salt = make([]byte, 32)
+	rand.Read(c.Salt)
+	c.Password = gas.Hash([]byte(pass), c.Salt)
 }
 
 func loadConfig() (*Config, error) {
-	if err := os.MkdirAll(appDir, os.FileMode(0755)); err != nil {
+	if err := os.MkdirAll(appDir, os.FileMode(0700)); err != nil {
 		return nil, err
 	}
 	var conf Config
@@ -138,17 +126,19 @@ func loadConfig() (*Config, error) {
 			if err != nil {
 				return nil, err
 			}
+		} else {
+			return nil, fmt.Errorf("reading config: %v", err)
 		}
 	} else {
 		configLock.RLock()
 		defer configLock.RUnlock()
 		b, err := ioutil.ReadAll(confFile)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("reading config: %v", err)
 		}
 		err = json.Unmarshal(b, &conf)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("decoding config: %v", err)
 		}
 	}
 
@@ -158,13 +148,13 @@ func loadConfig() (*Config, error) {
 func writeConfig(conf *Config, to string) error {
 	b, err := json.MarshalIndent(conf, "", "    ")
 	if err != nil {
-		return err
+		return fmt.Errorf("encoding config: %v", err)
 	}
 	configLock.Lock()
 	defer configLock.Unlock()
 	file, err := os.OpenFile(to, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(0600))
 	if err != nil {
-		return err
+		return fmt.Errorf("writing config: %v", err)
 	}
 	defer file.Close()
 	file.Write(b)
@@ -179,7 +169,7 @@ func getConfig(g *gas.Gas) (int, gas.Outputter) {
 
 	// if there's a password set, only allow user into config if they're logged
 	// in, otherwise it's probably the first run and they need to enter one
-	if conf.Password != "" {
+	if conf.Password != nil {
 		if sess, _ := g.Session(); sess == nil {
 			return 303, gas.Reroute("/login", "/config")
 		}
@@ -188,24 +178,19 @@ func getConfig(g *gas.Gas) (int, gas.Outputter) {
 	return 200, gas.HTML("config", conf, "common")
 }
 
-type Error struct {
-	Err string
-}
-
 func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	oldconf, err := loadConfig()
 	if err != nil {
-		return 500, gas.JSON(&Error{err.Error()})
+		return 500, gas.JSON(&Resp{Err: err.Error()})
 	}
 
-	if oldconf.Password != "" {
+	if oldconf.Password != nil {
 		got := g.FormValue("oldpass")
 		if got == "" {
-			return 403, gas.JSON(&Error{"you forgot your password"})
+			return 403, gas.JSON(&Resp{Err: "you forgot your password"})
 		}
-		hash, salt, _ := oldconf.Secrets()
-		if !gas.VerifyHash([]byte(got), hash, salt) {
-			return 403, gas.JSON(&Error{"incorrect password"})
+		if !gas.VerifyHash([]byte(got), oldconf.Password, oldconf.Salt) {
+			return 403, gas.JSON(&Resp{Err: "incorrect password"})
 		}
 	}
 
@@ -216,20 +201,20 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 
 	pass := g.FormValue("password")
 	if pass == "" {
-		return 400, gas.JSON(&Error{"cannot set empty password"})
+		return 400, gas.JSON(&Resp{Err: "cannot set empty password"})
 	}
-	conf.Password = makePass(pass)
+	conf.setPass(pass)
 
 	port, err := strconv.Atoi(g.FormValue("port"))
 	if err != nil {
-		return 400, gas.JSON(&Error{err.Error()})
+		return 400, gas.JSON(&Resp{Err: err.Error()})
 	}
 	conf.Port = port
 
 	path := filepath.Join(appDir, "config")
 	err = writeConfig(&conf, path)
 	if err != nil {
-		return 500, gas.JSON(&Error{err.Error()})
+		return 500, gas.JSON(&Resp{Err: err.Error()})
 	}
 
 	return 204, nil
@@ -243,7 +228,7 @@ func getLogin(g *gas.Gas) (int, gas.Outputter) {
 
 	conf, err := loadConfig()
 	if err == nil {
-		if conf.Password == "" {
+		if conf.Password == nil {
 			return 302, gas.Redirect("/config")
 		}
 	}
@@ -302,11 +287,10 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 }
 
 type Resp struct {
-	URL string
-	Err string
+	URL string `json:",omitempty"`
+	Err string `json:",omitempty"`
 }
 
-// optional. May also use SFTP to upload files.
 func postFile(g *gas.Gas) (int, gas.Outputter) {
 	conf, err := loadConfig()
 	if err != nil {
@@ -314,13 +298,12 @@ func postFile(g *gas.Gas) (int, gas.Outputter) {
 	}
 
 	var h = g.Request.Header
-	if conf.Password != "" {
+	if conf.Password != nil {
 		pass := h.Get("X-Airlift-Password")
 		if pass == "" {
 			return 403, gas.JSON(&Resp{Err: "password required"})
 		}
-		hash, salt, _ := conf.Secrets()
-		if !gas.VerifyHash([]byte(pass), hash, salt) {
+		if !gas.VerifyHash([]byte(pass), conf.Password, conf.Salt) {
 			return 403, gas.JSON(&Resp{Err: "incorrect password"})
 		}
 	}
@@ -361,10 +344,6 @@ func postFile(g *gas.Gas) (int, gas.Outputter) {
 	files.Files[hash] = destName
 
 	return 201, gas.JSON(&Resp{URL: path.Join(conf.Host, hash)})
-}
-
-func postFileMeta(g *gas.Gas) (int, gas.Outputter) {
-	return 501, gas.JSON(&Resp{Err: "Not implemented"})
 }
 
 func makeHash(hash []byte) string {
