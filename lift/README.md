@@ -22,9 +22,26 @@ Binaries will be made available for common platforms. To build it yourself,
    build environment. This client uses cgo, so there may be some
    platform-specific issues to take into consideration.
 
+#### Windows
+
 If on Windows, set `CC` to the name of your MinGW32 compiler if needed. If the
 linker complains, you will need to add the location of crypt32.lib (or
 libcrypt32.a) to the linker path.
+
+#### Cygwin
+
+Since Go doesn't officially support Cygwin, you have to use MinGW32 to compile.
+You don't have to *install* MinGW32, though, just get the MinGW32 gcc suite for
+your architecture from the Cygwin installer and compile with either
+
+```
+$ CC=x86_64-w64-mingw32-gcc go build
+```
+
+for 64-bit, or whatever the equivalent for 32-bit is.
+
+Note that since the Windows versions of the Go packages use all Windows APIs, it
+won't understand anything Cygwin-specific such as symbolic links and the like.
 
 ### Usage
 
