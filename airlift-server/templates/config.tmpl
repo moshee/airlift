@@ -46,16 +46,16 @@
           if (e.target.status === 204) {
             showMessage('Configuration updated.', 'good');
             $('#password').value = '';
+            if (timeout != null) window.clearTimeout(timeout);
+            timeout = window.setTimeout(hideMessage, 5000);
           } else {
-            var resp = JSON.parse(e.target.responseText);
+            var resp = x.response;
             if (resp != null && resp.Err != null) {
               showMessage('Error: ' + resp.Err, 'bad');
             } else {
               showMessage('An unknown error occurred (status ' + e.target.status + ')', 'bad');
             }
           }
-          if (timeout != null) window.clearTimeout(timeout);
-          timeout = window.setTimeout(hideMessage, 5000);
         }, false);
 
         x.open('POST', '/config', true);
