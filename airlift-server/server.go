@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"code.google.com/p/go.crypto/sha3"
 
 	"github.com/moshee/gas"
@@ -72,6 +73,8 @@ func main() {
 		files.Files[parts[0]] = name
 	}
 
+	go pruneOldUploads(conf)
+
 	gas.New().
 		Get("/config", getConfig).
 		Post("/config", postConfig).
@@ -93,6 +96,7 @@ type Config struct {
 	Password  []byte
 	Salt      []byte
 	Directory string
+	MaxAge    int // max age of uploads in days
 }
 
 // satisfies gas.User interface
@@ -210,6 +214,20 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 		return 400, gas.JSON(&Resp{Err: err.Error()})
 	}
 	conf.Port = port
+
+	sage := g.FormValue("max-age")
+	if len(sage) == 0 {
+		conf.MaxAge = 0
+	} else {
+		age, err := strconv.Atoi(sage)
+		if err != nil {
+			return 400, gas.JSON(&Resp{Err: err.Error()})
+		}
+		if age < 0 {
+			age = 0
+		}
+		conf.MaxAge = age
+	}
 
 	path := filepath.Join(appDir, "config")
 	err = writeConfig(&conf, path)
@@ -362,4 +380,38 @@ func makeHash(hash []byte) string {
 	}
 
 	return string(s)
+}
+
+// mini cron
+func pruneOldUploads(conf *Config) {
+	for {
+		before := time.Now()
+		n := 0
+		if conf.MaxAge > 0 {
+			cutoff := before.Add(-time.Duration(conf.MaxAge) * 24 * time.Hour)
+			files.Lock()
+			for id, file := range files.Files {
+				p := filepath.Join(conf.Directory, file)
+				fi, err := os.Stat(p)
+				if err != nil {
+					continue
+				}
+				if fi.ModTime().Before(cutoff) {
+					if err := os.Remove(p); err != nil {
+						gas.LogWarning("Error pruning %s: %v", file, err)
+						continue
+					}
+					n++
+					delete(files.Files, id)
+				}
+			}
+			files.Unlock()
+		}
+		after := time.Now()
+		if n > 0 {
+			gas.LogNotice("%d uploads pruned (%v).", n, after.Sub(before))
+		}
+		// execute next on the nearest day
+		time.Sleep(before.AddDate(0, 0, 1).Truncate(24 * time.Hour).Sub(after))
+	}
 }

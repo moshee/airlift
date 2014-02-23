@@ -70,7 +70,7 @@
         font-size: 14px;
         color: #666;
       }
-      input[type=text], input[type=password] {
+      input[type=text], input[type=password], input[type=number] {
         width: 100%;
         padding: 8px;
         margin: 8px 0;
@@ -87,16 +87,22 @@
         outline: none;
         border: 2px solid #888;
         margin: 7px -1px;
+        padding-right: 7px;
       }
-      #host-box, #port-box {
+      .box {
         display: inline-block;
+        width: 100%;
       }
       #host-box {
-        width: 325px;
+        width: 129px;
         margin-right: 32px;
       }
       #port-box {
         width: 80px;
+        margin-right: 32px;
+      }
+      #max-age-box {
+        width: 160px;
       }
       #message-box {
         margin-bottom: 16px;
