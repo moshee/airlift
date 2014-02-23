@@ -205,9 +205,12 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 
 	pass := g.FormValue("password")
 	if pass == "" {
-		return 400, gas.JSON(&Resp{Err: "cannot set empty password"})
+		if oldconf.Password == nil {
+			return 400, gas.JSON(&Resp{Err: "cannot set empty password"})
+		}
+	} else {
+		conf.setPass(pass)
 	}
-	conf.setPass(pass)
 
 	port, err := strconv.Atoi(g.FormValue("port"))
 	if err != nil {
