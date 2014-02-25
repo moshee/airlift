@@ -14,7 +14,18 @@ doesn't support SSL/TLS standalone, but it's planned.
 
 ### Installing
 
-Binaries for common platforms will be coming soon™.
+Pick a binary:
+
+       | linux      | darwin
+-------|------------|------------
+ 386   | [~9.5M][1] | —
+ amd64 | [~12M][2]  | [~12M][3]
+
+[1]: http://static.displaynone.us/airlift-server/linux/386/airlift-server
+[2]: http://static.displaynone.us/airlift-server/linux/amd64/airlift-server
+[3]: http://static.displaynone.us/airlift-server/darwin/amd64/airlift-server
+
+I can add more platforms if anyone wants. I'll try to keep them current.
 
 #### Building
 
