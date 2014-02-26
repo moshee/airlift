@@ -81,7 +81,7 @@ In order to use SSL/TLS standalone, set the following environment variables:
  `GAS_TLS_PORT` | The port for the secure server to listen on
  `GAS_TLS_CERT` | The path to your certificate
  `GAS_TLS_KEY`  | The path to your key
- `GAS_PORT`     | *Optional:* set this if you **only** want HTTPS, not regular HTTP.
+ `GAS_PORT`     | *Optional:* set this to -1 if you **only** want HTTPS, not regular HTTP.
 
 If both HTTP and HTTPS are enabled, they will both serve from the same
 executable and HTTP requests will redirect to HTTPS.
