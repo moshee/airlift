@@ -17,12 +17,12 @@ You can choose to run it behind a frontend server or standalone.
 
        | linux      | darwin
 -------|------------|------------
- 386   | [~9.5M][1] | —
- amd64 | [~12M][2]  | [~12M][3]
+ 386   | [~2.5M][1] | —
+ amd64 | [~2.5M][2] | [~2.4M][3]
 
-[1]: http://static.displaynone.us/airlift-server/linux/386/airlift-server
-[2]: http://static.displaynone.us/airlift-server/linux/amd64/airlift-server
-[3]: http://static.displaynone.us/airlift-server/darwin/amd64/airlift-server
+[1]: http://static.displaynone.us/airlift-server/airlift-server-linux_386.tar.bz2
+[2]: http://static.displaynone.us/airlift-server/airlift-server-linux_amd64.tar.bz2
+[3]: http://static.displaynone.us/airlift-server/airlift-server-darwin_amd64.tar.bz2
 
 I can add more platforms if anyone wants. I'll try to keep them current.
 
