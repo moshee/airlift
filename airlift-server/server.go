@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -76,6 +77,7 @@ func main() {
 	go pruneOldUploads(conf)
 
 	gas.New().
+		Use(redirectTLS).
 		Get("/config", getConfig).
 		Post("/config", postConfig).
 		Get("/login", getLogin).
@@ -85,9 +87,24 @@ func main() {
 		Get("/{id}/{filename}", getFile).
 		Get("/{id}", getFile)
 
-	gas.Ignition(&http.Server{
-		Addr: ":" + strconv.Itoa(conf.Port),
-	})
+	gas.Env.Port = conf.Port
+
+	gas.Ignition(nil)
+}
+
+func redirectTLS(g *gas.Gas) (int, gas.Outputter) {
+	if g.TLS == nil && gas.Env.TLSPort > 0 {
+		host := g.Host
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+		port := ""
+		if gas.Env.TLSPort != 443 {
+			port = ":" + strconv.Itoa(gas.Env.TLSPort)
+		}
+		return 302, gas.Redirect(fmt.Sprintf("https://%s%s%s", host, port, g.URL.Path))
+	}
+	return 0, nil
 }
 
 type Config struct {

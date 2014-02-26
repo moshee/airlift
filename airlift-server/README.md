@@ -9,12 +9,11 @@ The server is packaged as a statically compiled binary with a few text assets
 with no system dependencies apart from maybe libc for networking. Just download
 (or clone and build), add to your init system of choice, and run.
 
-You can choose to run it behind a frontend server or standalone. Currently it
-doesn't support SSL/TLS standalone, but it's planned.
+You can choose to run it behind a frontend server or standalone. 
 
 ### Installing
 
-Pick a binary:
+#### If you just want a binary
 
        | linux      | darwin
 -------|------------|------------
@@ -27,7 +26,7 @@ Pick a binary:
 
 I can add more platforms if anyone wants. I'll try to keep them current.
 
-#### Building
+#### Or if you want to build it yourself
 
 Before you build, if you have not already:
 
@@ -37,20 +36,21 @@ Before you build, if you have not already:
 
 Then,
 
-1. `$ go get -u -d github.com/moshee/airlift/airlift-server`
-2. `$ cd $GOPATH/src/github.com/moshee/airlift/airlift-server`
-3. `$ go build`
-
-`go get` should clone this repo along with any dependencies and place it
-in your `$GOPATH`. The binary produced by `go build` will be in your working
-directory at the moment you built it.
+```
+$ go get -u github.com/moshee/airlift/airlift-server
+```
 
 I haven't tried to build or run it on Windows, YMMV. Works on OS X and
 GNU+Linux.
 
+`go get` should clone this repo along with any dependencies and place it
+in your `$GOPATH`. The binary produced by `go build` will be in your working
+directory at the moment you built it. By default, `go get` will install the
+binary to `$GOPATH/bin` after building. It isn't very useful there, because...
+
 ### Usage
 
-The server must be run with the `templates` subdirectory in its working
+...the server must be run with the `templates` subdirectory in its working
 directory. Whatever else you do is up to you. Just `$ ./airlift-server` to run
 it in your terminal. Use your favorite tools to background it.
 
@@ -70,3 +70,17 @@ You may have to restart the server after modifying the configuration.
 
 If the server fails to start with a config error, you probably want to delete
 `~/.airlift-server/config` and reconfigure from scratch.
+
+#### HTTPS
+
+In order to use SSL/TLS standalone, set the following environment variables:
+
+ Variable       | Value
+----------------|---------------------------------------------
+ `GAS_TLS_PORT` | The port for the secure server to listen on
+ `GAS_TLS_CERT` | The path to your certificate
+ `GAS_TLS_KEY`  | The path to your key
+ `GAS_PORT`     | *Optional:* set this if you **only** want HTTPS, not regular HTTP.
+
+If both HTTP and HTTPS are enabled, they will both serve from the same
+executable and HTTP requests will redirect to HTTPS.
