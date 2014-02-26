@@ -51,7 +51,8 @@ func main() {
 	sessDir := filepath.Join(appDir, "sessions")
 	os.RemoveAll(sessDir)
 	store := &gas.FileStore{Root: sessDir}
-	defer store.Destroy()
+
+	gas.AddDestructor(store.Destroy)
 
 	gas.UseSessionStore(store)
 
