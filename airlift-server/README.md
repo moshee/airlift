@@ -56,15 +56,16 @@ it in your terminal. Use your favorite tools to background it.
 
 When you start the server for the first time, it will generate a dotfolder in
 your home directory for local configuration. Visit
-`http(s)://<yourhost>/config` to set up a password, or change the uploads
-directory, listen port, and the hostname it uses for URLs. The default values
-are:
+`http(s)://<yourhost>/config` to set up a password and change other
+configuration parameters. On the first setup, an empty password will not be
+accepted. The defaults are:
 
  Field | Value     | Notes
 -------|-----------|----------------------------------------------
  Host  | (empty)   | Leaving the host field empty will cause the server to return whatever host the file was posted to.
  Port  | 60606     | This is the port the server executable listens on. If you are using e.g. nginx, you can just add a `proxy_pass http://localhost:60606` directive inside a server block for the host you choose.
  Directory | ~/.airlift-server/uploads | This is where uploaded files will be stored.
+ Max upload age | 0 | If this value is greater than 0, uploads older than that many days will be automatically deleted.
 
 You may have to restart the server after modifying the configuration.
 
