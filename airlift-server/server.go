@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -15,6 +14,7 @@ import (
 	"os/user"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,12 +25,8 @@ import (
 )
 
 var (
-	logger = log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile)
-	appDir string
-	files  struct {
-		Files map[string]string
-		sync.RWMutex
-	}
+	appDir        string
+	fileList      *FileList
 	defaultConfig = Config{
 		Host: "",
 		Port: 60606,
@@ -58,24 +54,15 @@ func main() {
 
 	conf, err := loadConfig()
 	if err != nil {
-		log.Fatal(err)
+		gas.LogFatal("%v", err)
 	}
 
-	// make sure the uploads folder is there, and then load all of the file
-	// names and IDs into memory
-	os.MkdirAll(conf.Directory, os.FileMode(0700))
-	files.Files = make(map[string]string)
-	list, err := ioutil.ReadDir(conf.Directory)
+	fileList, err = conf.loadFiles()
 	if err != nil {
-		log.Fatal(err)
-	}
-	for _, file := range list {
-		name := file.Name()
-		parts := strings.SplitN(file.Name(), ".", 2)
-		files.Files[parts[0]] = name
+		gas.LogFatal("loading files: %v", err)
 	}
 
-	go pruneOldUploads(conf)
+	go fileList.watchAges(conf)
 
 	gas.New().
 		Use(redirectTLS).
@@ -108,13 +95,160 @@ func redirectTLS(g *gas.Gas) (int, gas.Outputter) {
 	return 0, nil
 }
 
+func (conf *Config) loadFiles() (*FileList, error) {
+	files := new(FileList)
+	// make sure the uploads folder is there, and then load all of the file
+	// names and IDs into memory
+	os.MkdirAll(conf.Directory, os.FileMode(0700))
+	files.Files = make(map[string]os.FileInfo)
+	list, err := ioutil.ReadDir(conf.Directory)
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range list {
+		parts := strings.SplitN(file.Name(), ".", 2)
+		files.Files[parts[0]] = file
+		files.Size += file.Size()
+	}
+
+	return files, nil
+}
+
+type FileList struct {
+	Files map[string]os.FileInfo
+	Size  int64
+	sync.RWMutex
+}
+
+func (files *FileList) get(id string) string {
+	files.RLock()
+	defer files.RUnlock()
+	return files.Files[id].Name()
+}
+
+// put creates a temp file, downloads a post body to it, moves it to the
+// uploads, adds the file to the in-memory list, and returns the generated
+// hash.
+func (files *FileList) put(conf *Config, content io.Reader, filename string) (string, error) {
+	tmp, err := ioutil.TempFile("", "airlift-upload")
+	if err != nil {
+		return "", err
+	}
+
+	defer tmp.Close()
+
+	// download file from client to a temp file, taking the sha3 at the same
+	// time
+	tmpname := tmp.Name()
+	sha := sha3.NewKeccak256()
+	w := io.MultiWriter(tmp, sha)
+	io.Copy(w, content)
+	hash := makeHash(sha.Sum(nil))
+
+	// build the ID and URL and move the temp file to the correct location
+	destName := hash + "." + filename
+	dest := filepath.Join(conf.Directory, destName)
+	if err = os.Rename(tmpname, dest); err != nil {
+		os.Remove(tmpname)
+		return "", err
+	}
+	fi, err := os.Stat(dest)
+	if err != nil {
+		return "", err
+	}
+
+	files.Lock()
+	defer files.Unlock()
+	files.Files[hash] = fi
+	files.Size += fi.Size()
+
+	if conf.MaxSize > 0 {
+		files.pruneOldest(conf)
+	}
+	return hash, nil
+}
+
+func (files *FileList) pruneOldest(conf *Config) {
+	ids := make([]string, 0, len(files.Files))
+	for id := range files.Files {
+		ids = append(ids, id)
+	}
+
+	sort.Sort(byModtime(ids))
+	pruned := int64(0)
+	n := 0
+	for ; files.Size > conf.MaxSize*1024*1024 && len(ids) > 0; ids = ids[1:] {
+		id := ids[0]
+		f := files.Files[id]
+		name := filepath.Join(conf.Directory, f.Name())
+		if err := os.Remove(name); err != nil {
+			gas.LogWarning("pruning %s: %v", f.Name(), err)
+			continue
+		}
+		delete(files.Files, id)
+		files.Size -= f.Size()
+		pruned += f.Size()
+		n++
+	}
+	if n > 0 {
+		gas.LogNotice("Pruned %d uploads (%.2fMB) to keep under %dMB",
+			n, float64(pruned)/(1024*1024), conf.MaxSize)
+	}
+}
+
+type byModtime []string
+
+func (s byModtime) Len() int { return len(s) }
+func (s byModtime) Less(i, j int) bool {
+	a := fileList.Files[s[i]].ModTime()
+	b := fileList.Files[s[j]].ModTime()
+	return a.Before(b)
+}
+func (s byModtime) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (files *FileList) watchAges(conf *Config) {
+	for {
+		before := time.Now()
+		if conf.MaxAge > 0 {
+			cutoff := before.Add(-time.Duration(conf.MaxAge) * 24 * time.Hour)
+			files.pruneOld(conf, cutoff)
+		}
+		after := time.Now()
+		// execute next on the nearest day
+		time.Sleep(before.AddDate(0, 0, 1).Truncate(24 * time.Hour).Sub(after))
+	}
+}
+
+func (files *FileList) pruneOld(conf *Config, cutoff time.Time) {
+	files.Lock()
+	defer files.Unlock()
+	n := 0
+	for id, fi := range files.Files {
+		if fi.ModTime().Before(cutoff) {
+			name := filepath.Join(conf.Directory, fi.Name())
+			if err := os.Remove(name); err != nil {
+				gas.LogWarning("Error pruning %s: %v", fi.Name(), err)
+				continue
+			}
+			n++
+			delete(files.Files, id)
+		}
+	}
+	if n > 0 {
+		gas.LogNotice("%d upload(s) modified before %s pruned.", n, cutoff.Format("2006-01-02"))
+	}
+}
+
 type Config struct {
 	Host      string
 	Port      int
 	Password  []byte
 	Salt      []byte
 	Directory string
-	MaxAge    int // max age of uploads in days
+	MaxAge    int   // max age of uploads in days
+	MaxSize   int64 // max total size of uploads in MB
 }
 
 // satisfies gas.User interface
@@ -250,8 +384,22 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 		conf.MaxAge = age
 	}
 
+	ssize := g.FormValue("max-size")
+	if len(ssize) == 0 {
+		conf.MaxSize = 0
+	} else {
+		size, err := strconv.ParseInt(ssize, 10, 64)
+		if err != nil {
+			return 400, gas.JSON(&Resp{Err: err.Error()})
+		}
+		if size < 0 {
+			size = 0
+		}
+		conf.MaxSize = size
+	}
+
 	path := filepath.Join(appDir, "config")
-	err = writeConfig(&conf, path)
+	err = writeConfig(conf, path)
 	if err != nil {
 		return 500, gas.JSON(&Resp{Err: err.Error()})
 	}
@@ -305,12 +453,8 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	if err != nil {
 		return 500, g.Error(err)
 	}
-	files.RLock()
-	defer files.RUnlock()
-
-	id := g.Arg("id")
-	file, ok := files.Files[id]
-	if !ok {
+	file := fileList.get(g.Arg("id"))
+	if file == "" {
 		return 404, g.Error(errors.New("ID not found"))
 	}
 
@@ -350,38 +494,17 @@ func postFile(g *gas.Gas) (int, gas.Outputter) {
 	if filename == "" {
 		return 400, gas.JSON(&Resp{Err: "missing filename header"})
 	}
-	tmp, err := ioutil.TempFile("", "airlift-upload")
+	defer g.Body.Close()
+
+	hash, err := fileList.put(conf, g.Body, filename)
 	if err != nil {
 		return 500, gas.JSON(&Resp{Err: err.Error()})
 	}
 
-	defer tmp.Close()
-	defer g.Body.Close()
-
-	// download file from client to a temp file, taking the sha3 at the same
-	// time
-	tmpname := tmp.Name()
-	sha := sha3.NewKeccak256()
-	w := io.MultiWriter(tmp, sha)
-	io.Copy(w, g.Body)
-	hash := makeHash(sha.Sum(nil))
-
-	// build the ID and URL and move the temp file to the correct location
 	host := conf.Host
 	if host == "" {
 		host = g.Request.Host
 	}
-	destName := hash + "." + filename
-	dest := filepath.Join(conf.Directory, destName)
-	if err = os.Rename(tmpname, dest); err != nil {
-		os.Remove(tmpname)
-		return 500, gas.JSON(&Resp{Err: err.Error()})
-	}
-
-	files.Lock()
-	defer files.Unlock()
-	files.Files[hash] = destName
-
 	return 201, gas.JSON(&Resp{URL: path.Join(conf.Host, hash)})
 }
 
@@ -401,38 +524,4 @@ func makeHash(hash []byte) string {
 	}
 
 	return string(s)
-}
-
-// mini cron
-func pruneOldUploads(conf *Config) {
-	for {
-		before := time.Now()
-		n := 0
-		if conf.MaxAge > 0 {
-			cutoff := before.Add(-time.Duration(conf.MaxAge) * 24 * time.Hour)
-			files.Lock()
-			for id, file := range files.Files {
-				p := filepath.Join(conf.Directory, file)
-				fi, err := os.Stat(p)
-				if err != nil {
-					continue
-				}
-				if fi.ModTime().Before(cutoff) {
-					if err := os.Remove(p); err != nil {
-						gas.LogWarning("Error pruning %s: %v", file, err)
-						continue
-					}
-					n++
-					delete(files.Files, id)
-				}
-			}
-			files.Unlock()
-		}
-		after := time.Now()
-		if n > 0 {
-			gas.LogNotice("%d uploads pruned (%v).", n, after.Sub(before))
-		}
-		// execute next on the nearest day
-		time.Sleep(before.AddDate(0, 0, 1).Truncate(24 * time.Hour).Sub(after))
-	}
 }
