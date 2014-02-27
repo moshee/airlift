@@ -37,7 +37,7 @@ var (
 func init() {
 	u, err := user.Current()
 	if err != nil {
-		log.Fatal(err)
+		gas.LogFatal("%v", err)
 	}
 	appDir = filepath.Join(u.HomeDir, ".airlift-server")
 	defaultConfig.Directory = filepath.Join(appDir, "uploads")
@@ -335,33 +335,29 @@ func getConfig(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func postConfig(g *gas.Gas) (int, gas.Outputter) {
-	oldconf, err := loadConfig()
+	conf, err := loadConfig()
 	if err != nil {
 		return 500, gas.JSON(&Resp{Err: err.Error()})
 	}
 
-	if oldconf.Password != nil {
+	conf.Host = g.FormValue("host")
+	conf.Directory = g.FormValue("directory")
+
+	if conf.Password == nil {
+		pass := g.FormValue("password")
+		if pass == "" {
+			return 400, gas.JSON(&Resp{Err: "cannot set empty password"})
+		} else {
+			conf.setPass(pass)
+		}
+	} else {
 		got := g.FormValue("oldpass")
 		if got == "" {
 			return 403, gas.JSON(&Resp{Err: "you forgot your password"})
 		}
-		if !gas.VerifyHash([]byte(got), oldconf.Password, oldconf.Salt) {
+		if !gas.VerifyHash([]byte(got), conf.Password, conf.Salt) {
 			return 403, gas.JSON(&Resp{Err: "incorrect password"})
 		}
-	}
-
-	conf := Config{
-		Host:      g.FormValue("host"),
-		Directory: g.FormValue("directory"),
-	}
-
-	pass := g.FormValue("password")
-	if pass == "" {
-		if oldconf.Password == nil {
-			return 400, gas.JSON(&Resp{Err: "cannot set empty password"})
-		}
-	} else {
-		conf.setPass(pass)
 	}
 
 	port, err := strconv.Atoi(g.FormValue("port"))
