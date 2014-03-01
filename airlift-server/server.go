@@ -123,7 +123,11 @@ type FileList struct {
 func (files *FileList) get(id string) string {
 	files.RLock()
 	defer files.RUnlock()
-	return files.Files[id].Name()
+	file, ok := files.Files[id]
+	if !ok {
+		return ""
+	}
+	return file.Name()
 }
 
 // put creates a temp file, downloads a post body to it, moves it to the
