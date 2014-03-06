@@ -157,7 +157,6 @@ func makeZip(uploads []FileUpload) FileUpload {
 	go spinner(done)
 
 	z := zip.NewWriter(tmp)
-	//now := time.Now()
 
 	for _, upload := range uploads {
 		var (
@@ -188,7 +187,8 @@ func makeZip(uploads []FileUpload) FileUpload {
 
 	done <- struct{}{}
 
-	return FileUpload{"upload.zip", tmp.Name()}
+	name := time.Now().Format("archive-20060102-150405.zip")
+	return FileUpload{name, tmp.Name()}
 }
 
 var tempFiles []string
