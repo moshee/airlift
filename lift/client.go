@@ -1,8 +1,6 @@
 package main
 
 import (
-	"archive/zip"
-	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -16,7 +14,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 var (
@@ -25,10 +22,12 @@ var (
 	flag_addr     = flag.String("a", "", "Set whole address of server to upload to")
 	flag_name     = flag.String("f", "", "Specify a different filename to use. If -z, it names the zip archive")
 	flag_stdin    = flag.String("s", "", "Give stdin stream a filename")
+	flag_remove   = flag.String("r", "", "Instruct the server to delete the file with a given ID")
 	flag_zip      = flag.Bool("z", false, "Upload the input file(s) (and stdin) as a single zip file")
 	flag_inclname = flag.Bool("n", false, "Include filename in returned URL")
 	flag_nocopy   = flag.Bool("C", false, "Do not copy link to clipboard")
 	flag_noprog   = flag.Bool("P", false, "Do not show progress bar")
+	flag_oops     = flag.Bool("oops", false, "Delete the last file uploaded")
 	dotfilePath   string
 )
 
@@ -65,9 +64,17 @@ func main() {
 
 	if flag.NArg() == 0 {
 		if configured {
-			os.Exit(0)
+			return
 		}
-		flag.Usage()
+
+		if *flag_oops {
+			oops(conf)
+		} else if *flag_remove != "" {
+			remove(conf, *flag_remove)
+		} else {
+			flag.Usage()
+		}
+		return
 	}
 
 	uploads := make([]FileUpload, 0, flag.NArg()+1)
@@ -83,22 +90,26 @@ func main() {
 			defer tmp.Close()
 
 			io.Copy(tmp, os.Stdin)
-			tmp.Seek(0, os.SEEK_SET)
+			tmp.Close()
 
-			s := FileUpload{"stdin", tmp}
+			// TODO: content sniffing to autogen some name slightly more
+			// meaningful than "stdin"?
+			s := FileUpload{"stdin", tmp.Name()}
 			if *flag_stdin != "" {
 				s.Name = *flag_stdin
 			}
 
 			uploads = append(uploads, s)
 		} else {
-			file, err := os.Open(arg)
+			fi, err := os.Stat(arg)
 			if err != nil {
-				log.Fatalln(err)
+				log.Fatal(err)
 			}
-			//name := filepath.Base(file.Name())
-			name := file.Name()
-			uploads = append(uploads, FileUpload{name, file})
+			if fi.IsDir() {
+				fmt.Fprintf(os.Stderr, "warn: skipping directory '%s'\n", arg)
+				continue
+			}
+			uploads = append(uploads, FileUpload{filepath.Base(arg), arg})
 		}
 	}
 
@@ -113,7 +124,7 @@ func main() {
 
 	urls := make([]string, 0, len(uploads))
 	for _, upload := range uploads {
-		u := tryPost(conf, upload)
+		u := postFile(conf, upload)
 		if u == "" {
 			return
 		}
@@ -132,6 +143,96 @@ func main() {
 	}
 }
 
+type Resp struct {
+	URL string
+	Err string
+}
+
+func (conf *Config) TryRequest(makeReq func() *http.Request, expectCode int) Resp {
+	if conf.Host == "" {
+		fmt.Fprintln(os.Stderr, "Host not configured.")
+		flag.Usage()
+	}
+
+	var alreadyWrong bool
+
+	for {
+		req := makeReq()
+		if err := conf.PrepareRequest(req); err != nil {
+			log.Fatal(err)
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if resp.StatusCode != expectCode {
+			fmt.Fprintln(os.Stderr, resp.Status)
+		}
+
+		var msg Resp
+
+		if resp.StatusCode != http.StatusNoContent {
+			err = json.NewDecoder(resp.Body).Decode(&msg)
+			resp.Body.Close()
+			if err != nil {
+				log.Fatalln("Invalid server response:", err)
+			}
+		}
+
+		switch resp.StatusCode {
+		case expectCode:
+			return msg
+
+		case http.StatusForbidden:
+			if alreadyWrong {
+				fmt.Fprintln(os.Stderr, "Sorry, wrong password.")
+			} else {
+				fmt.Fprintln(os.Stderr, "Server returned error:", msg.Err)
+				fmt.Fprintln(os.Stderr, "You'll need a new password. If the request is successful,")
+				fmt.Fprintf(os.Stderr, "it will be saved in %s.\n", PasswordStorageMechanism)
+				alreadyWrong = true
+			}
+			fmt.Fprint(os.Stderr, "Password: ")
+			pass, err := readPassword()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			if err = updatePassword(conf, pass); err != nil {
+				log.Fatalln(err)
+			}
+
+		default:
+			log.Fatal("Server returned error:", msg.Err)
+		}
+	}
+}
+
+func requestMaker(req *http.Request) func() *http.Request {
+	return func() *http.Request {
+		return req
+	}
+}
+
+func oops(conf *Config) {
+	req, err := http.NewRequest("POST", conf.BaseURL("/oops"), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	conf.TryRequest(requestMaker(req), http.StatusNoContent)
+}
+
+func remove(conf *Config, id string) {
+	req, err := http.NewRequest("DELETE", conf.BaseURL("/"+id), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	conf.TryRequest(requestMaker(req), http.StatusNoContent)
+}
+
 type NotAnError int
 
 func (err NotAnError) Error() string {
@@ -143,8 +244,23 @@ const (
 	errNotCopying                     // not copying anything on this system (no clipboard)
 )
 
-func (c *Config) UploadURL() string {
-	return c.Scheme + "://" + c.Host + ":" + c.Port + "/upload/file"
+func (c *Config) BaseURL(add string) string {
+	return c.Scheme + "://" + c.Host + ":" + c.Port + add
+}
+
+// attach the password. Only do so if there's a password stored for the given
+// host.
+func (c *Config) PrepareRequest(req *http.Request) error {
+	pass, err := getPassword(c)
+	switch err {
+	case nil:
+		req.Header.Set("X-Airlift-Password", pass)
+		return nil
+	case errPassNotFound:
+		return nil
+	default:
+		return err
+	}
 }
 
 func loadConfig() (*Config, error) {
@@ -226,302 +342,49 @@ func config(conf *Config) bool {
 }
 
 type FileUpload struct {
-	Name    string
-	Content io.ReadCloser
+	Name string // this is the name as it will be presented to the server
+	Path string // this is the path of the file on local disk, which could be anything
 }
 
-// Post file to server. Keep retrying if the password is incorrect,
-// otherwise exit with success or other errors.
-func tryPost(conf *Config, upload FileUpload) string {
-	if conf.Host == "" {
-		fmt.Fprintln(os.Stderr, "Host not configured.")
-		flag.Usage()
-	}
-
-	var alreadyWrong bool
-
-	for {
-		resp := postFile(conf, upload)
-		var msg Resp
-		err := json.NewDecoder(resp.Body).Decode(&msg)
-		resp.Body.Close()
-
-		if resp.StatusCode != http.StatusCreated {
-			fmt.Fprintln(os.Stderr, resp.Status)
-		}
+func postFile(conf *Config, upload FileUpload) string {
+	msg := conf.TryRequest(func() *http.Request {
+		file, err := os.Open(upload.Path)
 		if err != nil {
-			log.Fatalln("Invalid server response:", err)
+			log.Fatal(err)
 		}
 
-		switch resp.StatusCode {
-		case http.StatusForbidden:
-			if alreadyWrong {
-				fmt.Fprintln(os.Stderr, "Sorry, wrong password.")
-			} else {
-				fmt.Fprintln(os.Stderr, "Server returned error:", msg.Err)
-				fmt.Fprintln(os.Stderr, "You'll need a new password. If the request is successful,")
-				fmt.Fprintf(os.Stderr, "it will be saved in %s.\n", PasswordStorageMechanism)
-				alreadyWrong = true
-			}
-			fmt.Fprint(os.Stderr, "Password: ")
-			pass, err := readPassword()
-			if err != nil {
-				log.Fatalln(err)
-			}
-			if err = updatePassword(conf, pass); err != nil {
-				log.Fatalln(err)
-			}
-
-		case http.StatusCreated:
-			u := msg.URL
-			if *flag_inclname {
-				u = path.Join(u, filepath.Base(upload.Name))
-			}
-			u = conf.Scheme + "://" + u
-			fmt.Println(u)
-			return u
-
-		default:
-			fmt.Fprintln(os.Stderr, "Server returned error:", msg.Err)
-			return ""
-		}
-	}
-
-}
-
-func postFile(conf *Config, upload FileUpload) *http.Response {
-	var (
-		sz  int64
-		err error
-	)
-
-	if seeker, ok := upload.Content.(io.Seeker); ok {
-		sz, err = seeker.Seek(0, os.SEEK_END)
+		sz, err := file.Seek(0, os.SEEK_END)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		seeker.Seek(0, os.SEEK_SET)
-	}
+		file.Seek(0, os.SEEK_SET)
 
-	var body io.ReadCloser
+		var body io.ReadCloser
 
-	// only show progress if the size is bigger than some arbitrary amount
-	// (512KiB) and -P isn't set
-	if sz > 512*1024 && !*flag_noprog {
-		r := newProgressReader(upload.Content, sz)
-		go r.Report()
-		body = r
-	} else {
-		body = upload.Content
-	}
-
-	req, err := http.NewRequest("POST", conf.UploadURL(), body)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	name := filepath.Base(upload.Name)
-	req.Header.Set("X-Airlift-Filename", name)
-
-	// attach the password. Only do so if there's a password stored for the
-	// given host.
-	pass, err := getPassword(conf)
-	switch err {
-	case nil:
-		req.Header.Set("X-Airlift-Password", pass)
-	case errPassNotFound:
-		break
-	default:
-		log.Fatalln(err)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	return resp
-}
-
-type Resp struct {
-	URL string
-	Err string
-}
-
-func newProgressReader(r io.ReadCloser, total int64) *ProgressReader {
-	p := &ProgressReader{
-		ReadCloser: r,
-		total:      total,
-		width:      getTermWidth(),
-		read: make(chan struct {
-			n   int
-			err error
-		}, 10),
-		closed: make(chan struct{}, 1),
-	}
-	if p.width >= 3 {
-		p.buf = make([]rune, p.width-2)
-	}
-	return p
-}
-
-type ProgressReader struct {
-	io.ReadCloser
-	total   int64
-	current int64
-	width   int
-	buf     []rune
-	read    chan struct {
-		n   int
-		err error
-	}
-	closed chan struct{}
-}
-
-var barChars = []rune{' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉'}
-
-func (r *ProgressReader) Read(p []byte) (n int, err error) {
-	n, err = r.ReadCloser.Read(p)
-	r.read <- struct {
-		n   int
-		err error
-	}{n, err}
-	return
-}
-
-func (r *ProgressReader) Close() error {
-	r.closed <- struct{}{}
-	return r.ReadCloser.Close()
-}
-
-func (r *ProgressReader) Report() {
-	if r.buf == nil {
-		<-r.closed
-		return
-	}
-	defer termClearLine()
-	t := time.NewTicker(33 * time.Millisecond)
-	for {
-		select {
-		case <-r.closed:
-			r.current = r.total
-			r.output()
-			return
-		case read := <-r.read:
-			if read.err != nil {
-				return
-			}
-			r.current += int64(read.n)
-		case <-t.C:
-			r.output()
-		}
-	}
-}
-
-func (r *ProgressReader) output() {
-	last := barChars[len(barChars)-1]
-	progress := float64(r.current) / float64(r.total)
-	q := float64(r.width-1) * progress
-	x := int(q)
-	frac := barChars[int((q-float64(x))*float64(len(barChars)))]
-
-	ch := last
-	for i := 0; i < len(r.buf); i++ {
-		if i == x {
-			r.buf[i] = frac
-			ch = ' '
+		// only show progress if the size is bigger than some arbitrary amount
+		// (512KiB) and -P isn't set
+		if sz > 512*1024 && !*flag_noprog {
+			r := newProgressReader(file, sz)
+			//go r.Report()
+			body = r
 		} else {
-			r.buf[i] = ch
+			body = file
 		}
-	}
-	//termClearLine()
-	os.Stderr.WriteString("[" + string(r.buf) + "]")
-	termReturn0()
-}
 
-// read a password from stdin, disabling console echo
-func readPassword() (string, error) {
-	toggleEcho(false)
-
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Scan()
-	s := scanner.Text()
-	fmt.Fprintln(os.Stderr)
-	if err := scanner.Err(); err != nil {
-		return "", err
-	}
-
-	toggleEcho(true)
-	return s, nil
-}
-
-func spinner(done chan struct{}) {
-	chars := []rune("▖▙▚▜▝▘▛▞▟▗")
-	t := time.NewTicker(33 * time.Millisecond)
-	for i := 0; ; i = (i + 1) % len(chars) {
-		select {
-		case <-done:
-			termClearLine()
-			return
-		case <-t.C:
-			fmt.Fprintf(os.Stderr, " %c", chars[i])
-			termReturn0()
-		}
-	}
-}
-
-// Write a zip file with the contents of each FileUpload and return a new
-// FileUpload containing the zip file. All files will be placed in the root of
-// the zip archive (there will be no directories).
-func makeZip(uploads []FileUpload) FileUpload {
-	if len(uploads) == 0 {
-		log.Fatalln("makeZip: no uploads to operate on")
-	}
-	tmp, err := ioutil.TempFile("", "airlift-upload")
-
-	if err != nil {
-		log.Fatalln("makeZip:", err)
-	}
-
-	done := make(chan struct{}, 1)
-	go spinner(done)
-
-	z := zip.NewWriter(tmp)
-	now := time.Now()
-
-	for _, upload := range uploads {
-		var (
-			fh  *zip.FileHeader
-			err error
-		)
-		if ulFile, ok := upload.Content.(*os.File); ok {
-			fi, err := ulFile.Stat()
-			if err != nil {
-				log.Fatalln(err)
-			}
-			fh, err = zip.FileInfoHeader(fi)
-			if err != nil {
-				log.Fatalln(err)
-			}
-		} else {
-			fh = &zip.FileHeader{
-				Method: zip.Deflate,
-			}
-			fh.SetModTime(now)
-			fh.SetMode(os.FileMode(0644))
-		}
-		fh.Name = upload.Name
-		w, err := z.CreateHeader(fh)
+		req, err := http.NewRequest("POST", conf.BaseURL("/upload/file"), body)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		io.Copy(w, upload.Content)
-		upload.Content.Close()
+
+		req.Header.Set("X-Airlift-Filename", upload.Name)
+		return req
+	}, http.StatusCreated)
+
+	u := msg.URL
+	if *flag_inclname {
+		u = path.Join(u, upload.Name)
 	}
-	z.Close()
-
-	done <- struct{}{}
-
-	tmp.Seek(0, os.SEEK_SET)
-	return FileUpload{"upload.zip", tmp}
+	u = conf.Scheme + "://" + u
+	fmt.Println(u)
+	return u
 }
