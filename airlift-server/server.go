@@ -64,20 +64,54 @@ func main() {
 
 	go fileList.watchAges(conf)
 
-	gas.New().
-		Use(redirectTLS).
-		Get("/config", getConfig).
-		Post("/config", postConfig).
-		Get("/login", getLogin).
-		Post("/login", postLogin).
+	r := gas.New()
+
+	if gas.Env.TLSPort > 0 {
+		r.Use(redirectTLS)
+	}
+
+	r.Get("/login", getLogin).
 		Get("/logout", getLogout).
-		Post("/upload/file", postFile).
-		Get("/{id}/{filename}", getFile).
-		Get("/{id}", getFile)
+		Post("/login", checkConfig, postLogin).
+		Get("/config", checkConfig, getConfig).
+		Post("/config", checkConfig, postConfig).
+		Post("/upload/file", checkPassword, postFile).
+		Post("/oops", checkPassword, oops).
+		Delete("/{id}", checkPassword, deleteFile).
+		Get("/{id}/{filename}", checkConfig, getFile).
+		Get("/{id}", checkConfig, getFile)
 
 	gas.Env.Port = conf.Port
 
 	gas.Ignition(nil)
+}
+
+func checkConfig(g *gas.Gas) (int, gas.Outputter) {
+	conf, err := loadConfig()
+	if err != nil {
+		return 500, gas.JSON(&Resp{Err: err.Error()})
+	}
+	g.SetData("conf", conf)
+	return 0, nil
+}
+
+func checkPassword(g *gas.Gas) (int, gas.Outputter) {
+	if code, o := checkConfig(g); code != 0 {
+		return code, o
+	}
+	conf := g.Data("conf").(*Config)
+
+	if conf.Password != nil {
+		pass := g.Request.Header.Get("X-Airlift-Password")
+		if pass == "" {
+			return 403, gas.JSON(&Resp{Err: "password required"})
+		}
+		if !gas.VerifyHash([]byte(pass), conf.Password, conf.Salt) {
+			return 403, gas.JSON(&Resp{Err: "incorrect password"})
+		}
+	}
+
+	return 0, nil
 }
 
 func redirectTLS(g *gas.Gas) (int, gas.Outputter) {
@@ -181,15 +215,13 @@ func (files *FileList) pruneOldest(conf *Config) {
 	sort.Sort(byModtime(ids))
 	pruned := int64(0)
 	n := 0
-	for ; files.Size > conf.MaxSize*1024*1024 && len(ids) > 0; ids = ids[1:] {
-		id := ids[0]
+	for i := 0; files.Size > conf.MaxSize*1024*1024 && i < len(ids); i++ {
+		id := ids[i]
 		f := files.Files[id]
-		name := filepath.Join(conf.Directory, f.Name())
-		if err := os.Remove(name); err != nil {
+		if err := files.remove(conf, id); err != nil {
 			gas.LogWarning("pruning %s: %v", f.Name(), err)
 			continue
 		}
-		delete(files.Files, id)
 		files.Size -= f.Size()
 		pruned += f.Size()
 		n++
@@ -198,6 +230,30 @@ func (files *FileList) pruneOldest(conf *Config) {
 		gas.LogNotice("Pruned %d uploads (%.2fMB) to keep under %dMB",
 			n, float64(pruned)/(1024*1024), conf.MaxSize)
 	}
+}
+
+func (files *FileList) pruneNewest(conf *Config) error {
+	files.Lock()
+	defer files.Unlock()
+
+	if len(files.Files) == 0 {
+		return nil
+	}
+
+	var newest os.FileInfo
+	newestId := ""
+
+	for id, fi := range files.Files {
+		if newest == nil {
+			newest = fi
+		}
+		if fi.ModTime().After(newest.ModTime()) {
+			newest = fi
+			newestId = id
+		}
+	}
+
+	return files.remove(conf, newestId)
 }
 
 type byModtime []string
@@ -231,18 +287,31 @@ func (files *FileList) pruneOld(conf *Config, cutoff time.Time) {
 	n := 0
 	for id, fi := range files.Files {
 		if fi.ModTime().Before(cutoff) {
-			name := filepath.Join(conf.Directory, fi.Name())
-			if err := os.Remove(name); err != nil {
+			if err := files.remove(conf, id); err != nil {
 				gas.LogWarning("Error pruning %s: %v", fi.Name(), err)
 				continue
 			}
-			n++
-			delete(files.Files, id)
 		}
 	}
 	if n > 0 {
 		gas.LogNotice("%d upload(s) modified before %s pruned.", n, cutoff.Format("2006-01-02"))
 	}
+}
+
+func (files *FileList) remove(conf *Config, id string) error {
+	fi, ok := files.Files[id]
+	if !ok {
+		return fmt.Errorf("File id %s doesn't exist", id)
+	}
+
+	name := filepath.Join(conf.Directory, fi.Name())
+	err := os.Remove(name)
+	if err != nil {
+		return err
+	}
+
+	delete(files.Files, id)
+	return nil
 }
 
 type Config struct {
@@ -322,10 +391,7 @@ func writeConfig(conf *Config, to string) error {
 }
 
 func getConfig(g *gas.Gas) (int, gas.Outputter) {
-	conf, err := loadConfig()
-	if err != nil {
-		return 500, g.Error(err)
-	}
+	conf := g.Data("conf").(*Config)
 
 	// if there's a password set, only allow user into config if they're logged
 	// in, otherwise it's probably the first run and they need to enter one
@@ -339,10 +405,7 @@ func getConfig(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func postConfig(g *gas.Gas) (int, gas.Outputter) {
-	conf, err := loadConfig()
-	if err != nil {
-		return 500, gas.JSON(&Resp{Err: err.Error()})
-	}
+	conf := g.Data("conf").(*Config)
 
 	conf.Host = g.FormValue("host")
 	conf.Directory = g.FormValue("directory")
@@ -424,10 +487,7 @@ func getLogin(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func postLogin(g *gas.Gas) (int, gas.Outputter) {
-	conf, err := loadConfig()
-	if err != nil {
-		return 500, g.Error(err)
-	}
+	conf := g.Data("conf").(*Config)
 	var path string
 	ok := g.Recover(&path) == nil
 
@@ -449,17 +509,14 @@ func getLogout(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func getFile(g *gas.Gas) (int, gas.Outputter) {
-	conf, err := loadConfig()
-	if err != nil {
-		return 500, g.Error(err)
-	}
+	conf := g.Data("conf").(*Config)
 	file := fileList.get(g.Arg("id"))
 	if file == "" {
 		return 404, g.Error(errors.New("ID not found"))
 	}
 
 	if g.Arg("filename") == "" {
-		filename := url.QueryEscape(strings.Split(file, ".")[1])
+		filename := url.QueryEscape(strings.SplitN(file, ".", 2)[1])
 		g.Header().Set("Content-Disposition", "filename="+filename)
 	}
 
@@ -475,22 +532,9 @@ type Resp struct {
 }
 
 func postFile(g *gas.Gas) (int, gas.Outputter) {
-	conf, err := loadConfig()
-	if err != nil {
-		return 500, gas.JSON(&Resp{Err: err.Error()})
-	}
+	conf := g.Data("conf").(*Config)
 
-	var h = g.Request.Header
-	if conf.Password != nil {
-		pass := h.Get("X-Airlift-Password")
-		if pass == "" {
-			return 403, gas.JSON(&Resp{Err: "password required"})
-		}
-		if !gas.VerifyHash([]byte(pass), conf.Password, conf.Salt) {
-			return 403, gas.JSON(&Resp{Err: "incorrect password"})
-		}
-	}
-	filename := h.Get("X-Airlift-Filename")
+	filename := g.Request.Header.Get("X-Airlift-Filename")
 	if filename == "" {
 		return 400, gas.JSON(&Resp{Err: "missing filename header"})
 	}
@@ -524,4 +568,31 @@ func makeHash(hash []byte) string {
 	}
 
 	return string(s)
+}
+
+func deleteFile(g *gas.Gas) (int, gas.Outputter) {
+	conf := g.Data("conf").(*Config)
+
+	id := g.Arg("id")
+	if id == "" {
+		return 400, gas.JSON(&Resp{Err: "file ID not specified"})
+	}
+
+	fileList.Lock()
+	defer fileList.Unlock()
+	if err := fileList.remove(conf, id); err != nil {
+		return 500, gas.JSON(&Resp{Err: err.Error()})
+	}
+
+	return 204, nil
+}
+
+func oops(g *gas.Gas) (int, gas.Outputter) {
+	conf := g.Data("conf").(*Config)
+
+	if err := fileList.pruneNewest(conf); err != nil {
+		return 500, gas.JSON(&Resp{Err: err.Error()})
+	}
+
+	return 204, nil
 }
