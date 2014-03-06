@@ -12,6 +12,10 @@
       <label for="max-age">Max upload age (days)</label>
       <input type="number" id="max-age" name="max-age" value="{{ .MaxAge }}" min="0">
     </div>
+    <div class="box" id="max-size-box" title="This is the maximum size of the uploads folder in megabytes. The oldest uploads will be pruned whenever the size reaches this value. If left blank or ≤0, no pruning will happen.">
+      <label for="max-size">Max uploads size (MB)</label>
+      <input type="number" id="max-size" name="max-size" value="{{ .MaxSize }}" min="0">
+    </div>
     <div class="box" id="directory-box" title="This is the directory on the server in which the uploaded files will reside.">
       <label for="directory">Directory</label>
       <input type="text" id="directory" name="directory" value="{{ .Directory }}" placeholder="/home/user/uploads">
@@ -49,7 +53,6 @@
           if (e.target.status === 204) {
             showMessage('Configuration updated.', 'good');
             $('#password').value = '';
-            if (timeout != null) window.clearTimeout(timeout);
             timeout = window.setTimeout(hideMessage, 5000);
           } else {
             var resp = JSON.parse(x.responseText);
@@ -67,6 +70,7 @@
     }, false);
 
     function showMessage(msg, classname) {
+      if (timeout != null) window.clearTimeout(timeout);
       var box = $('#message-box');
       if (box == null) {
         box = document.createElement('div');

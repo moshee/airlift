@@ -66,6 +66,7 @@ accepted. The defaults are:
  Port  | 60606     | This is the port the server executable listens on. If you are using e.g. nginx, you can just add a `proxy_pass http://localhost:60606` directive inside a server block for the host you choose.
  Directory | ~/.airlift-server/uploads | This is where uploaded files will be stored.
  Max upload age | 0 | If this value is greater than 0, uploads older than that many days will be automatically deleted.
+ Max upload size | 0 | If this value is greater than 0, the oldest uploads will be pruned on every new upload until the total size is less than that many megabytes.
 
 You may have to restart the server after modifying the configuration.
 
