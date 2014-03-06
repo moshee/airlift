@@ -147,6 +147,7 @@ func makeZip(uploads []FileUpload) FileUpload {
 	}
 	tmp, err := ioutil.TempFile("", "airlift-upload")
 	defer tmp.Close()
+	addTemp(tmp.Name())
 
 	if err != nil {
 		log.Fatalln("makeZip:", err)
@@ -188,4 +189,22 @@ func makeZip(uploads []FileUpload) FileUpload {
 	done <- struct{}{}
 
 	return FileUpload{"upload.zip", tmp.Name()}
+}
+
+var tempFiles []string
+
+func addTemp(path string) {
+	tempFiles = append(tempFiles, path)
+}
+
+func fatal(args ...interface{}) {
+	log.Print(args...)
+	exit(1)
+}
+
+func exit(code int) {
+	for _, file := range tempFiles {
+		os.Remove(file)
+	}
+	os.Exit(code)
 }

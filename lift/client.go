@@ -55,9 +55,11 @@ The location of this file is system-dependent:
 }
 
 func main() {
+	defer exit(0)
+
 	conf, err := loadConfig()
 	if err != nil {
-		log.Fatalln(err)
+		fatal(err)
 	}
 
 	configured := config(conf)
@@ -83,10 +85,10 @@ func main() {
 		if arg == "-" {
 			tmp, err := ioutil.TempFile("", "airlift-upload")
 			if err != nil {
-				log.Fatal("Failed to buffer stdin:", tmp)
+				fatal("Failed to buffer stdin:", tmp)
 			}
 
-			defer os.Remove(tmp.Name())
+			addTemp(tmp.Name())
 			defer tmp.Close()
 
 			io.Copy(tmp, os.Stdin)
@@ -103,7 +105,7 @@ func main() {
 		} else {
 			fi, err := os.Stat(arg)
 			if err != nil {
-				log.Fatal(err)
+				fatal(err)
 			}
 			if fi.IsDir() {
 				fmt.Fprintf(os.Stderr, "warn: skipping directory '%s'\n", arg)
@@ -159,12 +161,12 @@ func (conf *Config) TryRequest(makeReq func() *http.Request, expectCode int) Res
 	for {
 		req := makeReq()
 		if err := conf.PrepareRequest(req); err != nil {
-			log.Fatal(err)
+			fatal(err)
 		}
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			log.Fatal(err)
+			fatal(err)
 		}
 
 		if resp.StatusCode != expectCode {
@@ -177,7 +179,7 @@ func (conf *Config) TryRequest(makeReq func() *http.Request, expectCode int) Res
 			err = json.NewDecoder(resp.Body).Decode(&msg)
 			resp.Body.Close()
 			if err != nil {
-				log.Fatalln("Invalid server response:", err)
+				fatal("Invalid server response:", err)
 			}
 		}
 
@@ -197,14 +199,14 @@ func (conf *Config) TryRequest(makeReq func() *http.Request, expectCode int) Res
 			fmt.Fprint(os.Stderr, "Password: ")
 			pass, err := readPassword()
 			if err != nil {
-				log.Fatalln(err)
+				fatal(err)
 			}
 			if err = updatePassword(conf, pass); err != nil {
-				log.Fatalln(err)
+				fatal(err)
 			}
 
 		default:
-			log.Fatal("Server returned error:", msg.Err)
+			fatal("Server returned error:", msg.Err)
 		}
 	}
 }
@@ -218,7 +220,7 @@ func requestMaker(req *http.Request) func() *http.Request {
 func oops(conf *Config) {
 	req, err := http.NewRequest("POST", conf.BaseURL("/oops"), nil)
 	if err != nil {
-		log.Fatal(err)
+		fatal(err)
 	}
 
 	conf.TryRequest(requestMaker(req), http.StatusNoContent)
@@ -227,7 +229,7 @@ func oops(conf *Config) {
 func remove(conf *Config, id string) {
 	req, err := http.NewRequest("DELETE", conf.BaseURL("/"+id), nil)
 	if err != nil {
-		log.Fatal(err)
+		fatal(err)
 	}
 
 	conf.TryRequest(requestMaker(req), http.StatusNoContent)
@@ -315,7 +317,7 @@ func config(conf *Config) bool {
 		}
 		addr, err := url.Parse(*flag_addr)
 		if err != nil {
-			log.Fatalln("-a:", err)
+			fatal("-a:", err)
 		}
 		conf.Scheme = addr.Scheme
 		host, port, err := net.SplitHostPort(addr.Host)
@@ -334,7 +336,7 @@ func config(conf *Config) bool {
 
 	if configured {
 		if err := writeConfig(conf); err != nil {
-			log.Fatalln(err)
+			fatal(err)
 		}
 	}
 
@@ -350,12 +352,12 @@ func postFile(conf *Config, upload FileUpload) string {
 	msg := conf.TryRequest(func() *http.Request {
 		file, err := os.Open(upload.Path)
 		if err != nil {
-			log.Fatal(err)
+			fatal(err)
 		}
 
 		sz, err := file.Seek(0, os.SEEK_END)
 		if err != nil {
-			log.Fatalln(err)
+			fatal(err)
 		}
 		file.Seek(0, os.SEEK_SET)
 
@@ -373,7 +375,7 @@ func postFile(conf *Config, upload FileUpload) string {
 
 		req, err := http.NewRequest("POST", conf.BaseURL("/upload/file"), body)
 		if err != nil {
-			log.Fatalln(err)
+			fatal(err)
 		}
 
 		req.Header.Set("X-Airlift-Filename", upload.Name)
