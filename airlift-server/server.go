@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -22,6 +23,8 @@ import (
 	"code.google.com/p/go.crypto/sha3"
 
 	"github.com/moshee/gas"
+	"github.com/moshee/gas/auth"
+	"github.com/moshee/gas/out"
 )
 
 var (
@@ -37,7 +40,7 @@ var (
 func init() {
 	u, err := user.Current()
 	if err != nil {
-		gas.LogFatal("%v", err)
+		log.Fatal("%v", err)
 	}
 	appDir = filepath.Join(u.HomeDir, ".airlift-server")
 	defaultConfig.Directory = filepath.Join(appDir, "uploads")
@@ -46,20 +49,20 @@ func init() {
 func main() {
 	sessDir := filepath.Join(appDir, "sessions")
 	os.RemoveAll(sessDir)
-	store := &gas.FileStore{Root: sessDir}
+	store := &auth.FileStore{Root: sessDir}
 
 	gas.AddDestructor(store.Destroy)
 
-	gas.UseSessionStore(store)
+	auth.UseSessionStore(store)
 
 	conf, err := loadConfig()
 	if err != nil {
-		gas.LogFatal("%v", err)
+		log.Fatal(err)
 	}
 
 	fileList, err = conf.loadFiles()
 	if err != nil {
-		gas.LogFatal("loading files: %v", err)
+		log.Fatal("loading files: %v", err)
 	}
 
 	go fileList.watchAges(conf)
@@ -70,7 +73,10 @@ func main() {
 		r.Use(redirectTLS)
 	}
 
-	r.Get("/login", getLogin).
+	gas.Env.Port = conf.Port
+
+	r.UseMore(out.CheckReroute).
+		Get("/login", getLogin).
 		Get("/logout", getLogout).
 		Post("/login", checkConfig, postLogin).
 		Get("/config", checkConfig, getConfig).
@@ -79,20 +85,17 @@ func main() {
 		Post("/oops", checkPassword, oops).
 		Delete("/{id}", checkPassword, deleteFile).
 		Get("/{id}/{filename}", checkConfig, getFile).
-		Get("/{id}", checkConfig, getFile)
-
-	gas.Env.Port = conf.Port
-
-	gas.Ignition(nil)
+		Get("/{id}", checkConfig, getFile).
+		Ignition()
 }
 
 func checkConfig(g *gas.Gas) (int, gas.Outputter) {
 	conf, err := loadConfig()
 	if err != nil {
-		return 500, gas.JSON(&Resp{Err: err.Error()})
+		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 	g.SetData("conf", conf)
-	return 0, nil
+	return g.Continue()
 }
 
 func checkPassword(g *gas.Gas) (int, gas.Outputter) {
@@ -104,14 +107,14 @@ func checkPassword(g *gas.Gas) (int, gas.Outputter) {
 	if conf.Password != nil {
 		pass := g.Request.Header.Get("X-Airlift-Password")
 		if pass == "" {
-			return 403, gas.JSON(&Resp{Err: "password required"})
+			return 403, out.JSON(&Resp{Err: "password required"})
 		}
-		if !gas.VerifyHash([]byte(pass), conf.Password, conf.Salt) {
-			return 403, gas.JSON(&Resp{Err: "incorrect password"})
+		if !auth.VerifyHash([]byte(pass), conf.Password, conf.Salt) {
+			return 403, out.JSON(&Resp{Err: "incorrect password"})
 		}
 	}
 
-	return 0, nil
+	return g.Continue()
 }
 
 func redirectTLS(g *gas.Gas) (int, gas.Outputter) {
@@ -124,9 +127,9 @@ func redirectTLS(g *gas.Gas) (int, gas.Outputter) {
 		if gas.Env.TLSPort != 443 {
 			port = ":" + strconv.Itoa(gas.Env.TLSPort)
 		}
-		return 302, gas.Redirect(fmt.Sprintf("https://%s%s%s", host, port, g.URL.Path))
+		return 302, out.Redirect(fmt.Sprintf("https://%s%s%s", host, port, g.URL.Path))
 	}
-	return 0, nil
+	return g.Continue()
 }
 
 func (conf *Config) loadFiles() (*FileList, error) {
@@ -219,7 +222,7 @@ func (files *FileList) pruneOldest(conf *Config) {
 		id := ids[i]
 		f := files.Files[id]
 		if err := files.remove(conf, id); err != nil {
-			gas.LogWarning("pruning %s: %v", f.Name(), err)
+			log.Printf("pruning %s: %v", f.Name(), err)
 			continue
 		}
 		files.Size -= f.Size()
@@ -227,7 +230,7 @@ func (files *FileList) pruneOldest(conf *Config) {
 		n++
 	}
 	if n > 0 {
-		gas.LogNotice("Pruned %d uploads (%.2fMB) to keep under %dMB",
+		log.Printf("Pruned %d uploads (%.2fMB) to keep under %dMB",
 			n, float64(pruned)/(1024*1024), conf.MaxSize)
 	}
 }
@@ -288,13 +291,13 @@ func (files *FileList) pruneOld(conf *Config, cutoff time.Time) {
 	for id, fi := range files.Files {
 		if fi.ModTime().Before(cutoff) {
 			if err := files.remove(conf, id); err != nil {
-				gas.LogWarning("Error pruning %s: %v", fi.Name(), err)
+				log.Printf("Error pruning %s: %v", fi.Name(), err)
 				continue
 			}
 		}
 	}
 	if n > 0 {
-		gas.LogNotice("%d upload(s) modified before %s pruned.", n, cutoff.Format("2006-01-02"))
+		log.Printf("%d upload(s) modified before %s pruned.", n, cutoff.Format("2006-01-02"))
 	}
 }
 
@@ -337,7 +340,7 @@ func (c Config) Username() string {
 func (c *Config) setPass(pass string) {
 	c.Salt = make([]byte, 32)
 	rand.Read(c.Salt)
-	c.Password = gas.Hash([]byte(pass), c.Salt)
+	c.Password = auth.Hash([]byte(pass), c.Salt)
 }
 
 func loadConfig() (*Config, error) {
@@ -396,12 +399,12 @@ func getConfig(g *gas.Gas) (int, gas.Outputter) {
 	// if there's a password set, only allow user into config if they're logged
 	// in, otherwise it's probably the first run and they need to enter one
 	if conf.Password != nil {
-		if sess, _ := g.Session(); sess == nil {
-			return 303, gas.Reroute("/login", "/config")
+		if sess, _ := auth.GetSession(g); sess == nil {
+			return 303, out.Reroute("/login", "/config")
 		}
 	}
 
-	return 200, gas.HTML("config", conf, "common")
+	return 200, out.HTML("config", conf, "common")
 }
 
 func postConfig(g *gas.Gas) (int, gas.Outputter) {
@@ -413,23 +416,23 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	if conf.Password == nil {
 		pass := g.FormValue("password")
 		if pass == "" {
-			return 400, gas.JSON(&Resp{Err: "cannot set empty password"})
+			return 400, out.JSON(&Resp{Err: "cannot set empty password"})
 		} else {
 			conf.setPass(pass)
 		}
 	} else {
 		got := g.FormValue("oldpass")
 		if got == "" {
-			return 403, gas.JSON(&Resp{Err: "you forgot your password"})
+			return 403, out.JSON(&Resp{Err: "you forgot your password"})
 		}
-		if !gas.VerifyHash([]byte(got), conf.Password, conf.Salt) {
-			return 403, gas.JSON(&Resp{Err: "incorrect password"})
+		if !auth.VerifyHash([]byte(got), conf.Password, conf.Salt) {
+			return 403, out.JSON(&Resp{Err: "incorrect password"})
 		}
 	}
 
 	port, err := strconv.Atoi(g.FormValue("port"))
 	if err != nil {
-		return 400, gas.JSON(&Resp{Err: err.Error()})
+		return 400, out.JSON(&Resp{Err: err.Error()})
 	}
 	conf.Port = port
 
@@ -439,7 +442,7 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	} else {
 		age, err := strconv.Atoi(sage)
 		if err != nil {
-			return 400, gas.JSON(&Resp{Err: err.Error()})
+			return 400, out.JSON(&Resp{Err: err.Error()})
 		}
 		if age < 0 {
 			age = 0
@@ -453,7 +456,7 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	} else {
 		size, err := strconv.ParseInt(ssize, 10, 64)
 		if err != nil {
-			return 400, gas.JSON(&Resp{Err: err.Error()})
+			return 400, out.JSON(&Resp{Err: err.Error()})
 		}
 		if size < 0 {
 			size = 0
@@ -464,7 +467,7 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	path := filepath.Join(appDir, "config")
 	err = writeConfig(conf, path)
 	if err != nil {
-		return 500, gas.JSON(&Resp{Err: err.Error()})
+		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 
 	return 204, nil
@@ -472,47 +475,47 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 
 func getLogin(g *gas.Gas) (int, gas.Outputter) {
 	// already logged in
-	if sess, _ := g.Session(); sess != nil {
-		return 302, gas.Redirect("/config")
+	if sess, _ := auth.GetSession(g); sess != nil {
+		return 302, out.Redirect("/config")
 	}
 
 	conf, err := loadConfig()
 	if err == nil {
 		if conf.Password == nil {
-			return 302, gas.Redirect("/config")
+			return 302, out.Redirect("/config")
 		}
 	}
 
-	return 200, gas.HTML("login", false, "common")
+	return 200, out.HTML("login", false, "common")
 }
 
 func postLogin(g *gas.Gas) (int, gas.Outputter) {
 	conf := g.Data("conf").(*Config)
 	var path string
-	ok := g.Recover(&path) == nil
+	ok := out.Recover(g, &path) == nil
 
-	if err := g.SignIn(conf); err != nil {
-		return 200, gas.HTML("login", true, "common")
+	if err := auth.SignIn(g, conf); err != nil {
+		return 200, out.HTML("login", true, "common")
 	}
 
 	if !ok {
 		path = "/config"
 	}
-	return 302, gas.Redirect(path)
+	return 302, out.Redirect(path)
 }
 
 func getLogout(g *gas.Gas) (int, gas.Outputter) {
-	if err := g.SignOut(); err != nil {
-		return 500, g.Error(err)
+	if err := auth.SignOut(g); err != nil {
+		return 500, out.Error(g, err)
 	}
-	return 302, gas.Redirect("/login")
+	return 302, out.Redirect("/login")
 }
 
 func getFile(g *gas.Gas) (int, gas.Outputter) {
 	conf := g.Data("conf").(*Config)
 	file := fileList.get(g.Arg("id"))
 	if file == "" {
-		return 404, g.Error(errors.New("ID not found"))
+		return 404, out.Error(g, errors.New("ID not found"))
 	}
 
 	if g.Arg("filename") == "" {
@@ -536,20 +539,20 @@ func postFile(g *gas.Gas) (int, gas.Outputter) {
 
 	filename := g.Request.Header.Get("X-Airlift-Filename")
 	if filename == "" {
-		return 400, gas.JSON(&Resp{Err: "missing filename header"})
+		return 400, out.JSON(&Resp{Err: "missing filename header"})
 	}
 	defer g.Body.Close()
 
 	hash, err := fileList.put(conf, g.Body, filename)
 	if err != nil {
-		return 500, gas.JSON(&Resp{Err: err.Error()})
+		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 
 	host := conf.Host
 	if host == "" {
 		host = g.Request.Host
 	}
-	return 201, gas.JSON(&Resp{URL: path.Join(conf.Host, hash)})
+	return 201, out.JSON(&Resp{URL: path.Join(conf.Host, hash)})
 }
 
 func makeHash(hash []byte) string {
@@ -575,13 +578,13 @@ func deleteFile(g *gas.Gas) (int, gas.Outputter) {
 
 	id := g.Arg("id")
 	if id == "" {
-		return 400, gas.JSON(&Resp{Err: "file ID not specified"})
+		return 400, out.JSON(&Resp{Err: "file ID not specified"})
 	}
 
 	fileList.Lock()
 	defer fileList.Unlock()
 	if err := fileList.remove(conf, id); err != nil {
-		return 500, gas.JSON(&Resp{Err: err.Error()})
+		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 
 	return 204, nil
@@ -591,7 +594,7 @@ func oops(g *gas.Gas) (int, gas.Outputter) {
 	conf := g.Data("conf").(*Config)
 
 	if err := fileList.pruneNewest(conf); err != nil {
-		return 500, gas.JSON(&Resp{Err: err.Error()})
+		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 
 	return 204, nil
