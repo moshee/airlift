@@ -286,8 +286,8 @@ func loadConfig() (*Config, error) {
 
 func writeConfig(conf *Config) error {
 	dir := filepath.Dir(dotfilePath)
-	os.MkdirAll(dir, os.FileMode(0755))
-	file, err := os.OpenFile(dotfilePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(0600))
+	os.MkdirAll(dir, 0755)
+	file, err := os.OpenFile(dotfilePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
@@ -322,7 +322,7 @@ func config(conf *Config) bool {
 		conf.Scheme = addr.Scheme
 		host, port, err := net.SplitHostPort(addr.Host)
 		if err == nil {
-			conf.Host, conf.Port = host, port
+			conf.Host, conf.Port = path.Join(host, addr.Path), port
 		} else {
 			conf.Host = path.Join(addr.Host, addr.Path)
 		}

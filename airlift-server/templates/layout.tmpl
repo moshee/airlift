@@ -31,6 +31,7 @@
         padding: 32px;
         background: #fff;
         font-family: sans-serif;
+        position: relative;
         border: 3px solid #eee;
       }
       a, a:visited {
@@ -43,6 +44,21 @@
         border: 0;
         border-top: 1px solid #ccc;
         margin: 16px 0;
+      }
+      #help {
+        -webkit-user-select: none;
+        cursor: help;
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 35px;
+        height: 35px;
+        border-left: 3px solid #eee;
+        border-bottom: 3px solid #eee;
+        line-height: 32px;
+        text-align: center;
+        font-weight: 700;
+        color: #008;
       }
       button {
         -webkit-appearance: none;
@@ -91,7 +107,42 @@
       }
       .box {
         display: inline-block;
+        position: relative;
         width: 100%;
+      }
+      .box[data-tooltip]::before {
+        z-index: 9;
+        content: attr(data-tooltip);
+        display: none;
+        position: absolute;
+        font-size: 12px;
+        background: -webkit-linear-gradient(#fff, #fafafa);
+        color: #444;
+        border-radius: 2px;
+        border: 1px solid #ddd;
+        padding: 8px;
+        width: 256px;
+      }
+      .box[data-tooltip]:hover::before, #help:hover ~ .box[data-tooltip]::before {
+        display: block;
+      }
+      .box[data-tt-pos=left]::before {
+        right: 100%;
+        /*bottom: 0;*/
+        /*margin-top: 50%;*/
+        margin-right: 16px;
+      }
+      .box[data-tt-pos=right]::before {
+        left: 100%;
+        /*bottom: 0;*/
+        margin-left: 16px;
+        /*margin-top: 50%;*/
+      }
+      .box[data-tt-pos=top]::before {
+        left: 50%;
+        margin-left: -128px;
+        bottom: 100%;
+        margin-bottom: 16px;
       }
       #host-box {
         width: 325px;

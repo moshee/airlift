@@ -1,30 +1,31 @@
 {{ define "config" }}
   <form id="config">
-    <div class="box" id="host-box" title="This is the host that the URL will be appended to and returned when you upload a file. Leave it blank to use whichever host the uploader is accessed from.">
-      <label for="host">Host</label>
+    <div id="help">?</div>
+    <div class="box" id="host-box" data-tooltip="This is the base host and path that the URL will be appended to and returned when you upload a file. Leave it blank to use whichever host the uploader is accessed from." data-tt-pos="top">
+      <label for="host">Base path</label>
       <input type="text" id="host" name="host" value="{{ .Host }}" placeholder="i.example.com">
     </div>
-    <div class="box" id="port-box" title="This is the port that the server will listen on. You can set it to something other than 80 and set up a proxy with your existing web server.">
+    <div class="box" id="port-box" data-tooltip="This is the port that the server will listen on. You can set it to something other than 80 and set up a proxy with your existing web server." data-tt-pos="right">
       <label for="port">Port</label>
       <input type="text" id="port" name="port" value="{{ .Port }}" placeholder="80">
     </div>
-    <div class="box" id="max-age-box" title="This is the maximum age of an upload in days. Uploads will be automatically pruned when they reach this age. If left blank or ≤0, no pruning will happen.">
+    <div class="box" id="max-age-box" data-tooltip="This is the maximum age of an upload in days. Uploads will be automatically pruned when they reach this age. If left blank or ≤0, no pruning will happen." data-tt-pos="left">
       <label for="max-age">Max upload age (days)</label>
       <input type="number" id="max-age" name="max-age" value="{{ .MaxAge }}" min="0">
     </div>
-    <div class="box" id="max-size-box" title="This is the maximum size of the uploads folder in megabytes. The oldest uploads will be pruned whenever the size reaches this value. If left blank or ≤0, no pruning will happen.">
+    <div class="box" id="max-size-box" data-tooltip="This is the maximum size of the uploads folder in megabytes. The oldest uploads will be pruned whenever the size reaches this value. If left blank or ≤0, no pruning will happen." data-tt-pos="right">
       <label for="max-size">Max uploads size (MB)</label>
       <input type="number" id="max-size" name="max-size" value="{{ .MaxSize }}" min="0">
     </div>
-    <div class="box" id="directory-box" title="This is the directory on the server in which the uploaded files will reside.">
+    <div class="box" id="directory-box" data-tooltip="This is the directory on the server in which the uploaded files will reside." data-tt-pos="left">
       <label for="directory">Directory</label>
       <input type="text" id="directory" name="directory" value="{{ .Directory }}" placeholder="/home/user/uploads">
     </div>
-    <div class="box" id="password-box" title="Enter a new password here to change your password.">
+    <div class="box" id="password-box" data-tooltip="Enter a new password here to change your password." data-tt-pos="right">
       <label for="password">New password</label>
       <input type="password" id="password" name="password">
     </div>
-    <div class="box" id="oldpass-box" title="Whatever changes you make, enter your current password here to make sure that you're you. If you haven't set a password yet, though, you don't have to fill it out.">
+    <div class="box" id="oldpass-box" data-tooltip="Whatever changes you make, enter your current password here to make sure that you're you. If you haven't set a password yet, though, you don't have to fill it out." data-tt-pos="left">
       <label for="oldpass">Current password</label>
       <input type="password" id="oldpass" name="oldpass" required placeholder="Required">
     </div>
