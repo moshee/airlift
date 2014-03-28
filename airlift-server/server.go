@@ -40,7 +40,7 @@ var (
 func init() {
 	u, err := user.Current()
 	if err != nil {
-		log.Fatal("%v", err)
+		log.Fatal(err)
 	}
 	appDir = filepath.Join(u.HomeDir, ".airlift-server")
 	defaultConfig.Directory = filepath.Join(appDir, "uploads")
@@ -62,7 +62,7 @@ func main() {
 
 	fileList, err = conf.loadFiles()
 	if err != nil {
-		log.Fatal("loading files: %v", err)
+		log.Fatalln("loading files:", err)
 	}
 
 	go fileList.watchAges(conf)
@@ -73,7 +73,9 @@ func main() {
 		r.Use(redirectTLS)
 	}
 
-	gas.Env.Port = conf.Port
+	if conf.Port <= 0 {
+		gas.Env.Port = conf.Port
+	}
 
 	r.UseMore(out.CheckReroute).
 		Get("/login", getLogin).
@@ -552,7 +554,7 @@ func postFile(g *gas.Gas) (int, gas.Outputter) {
 	if host == "" {
 		host = g.Request.Host
 	}
-	return 201, out.JSON(&Resp{URL: path.Join(conf.Host, hash)})
+	return 201, out.JSON(&Resp{URL: path.Join(host, hash)})
 }
 
 func makeHash(hash []byte) string {
