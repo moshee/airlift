@@ -72,7 +72,7 @@ file was posted to.
 
 **Port** [60606]: This is the port the server executable listens on.
 
-The environment variable `GAS_PORT` overrides the port stored in the configuration.
+The `-p` flag overrides the configured port.
 
 If you are using e.g. nginx, you can just add a
 `proxy_pass http://localhost:60606;` directive inside a server block for the
