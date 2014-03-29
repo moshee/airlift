@@ -24,7 +24,8 @@ var (
 	flag_stdin    = flag.String("s", "", "Give stdin stream a filename")
 	flag_remove   = flag.String("r", "", "Instruct the server to delete the file with a given ID")
 	flag_zip      = flag.Bool("z", false, "Upload the input file(s) (and stdin) as a single zip file")
-	flag_inclname = flag.Bool("n", false, "Include filename in returned URL")
+	flag_inclname = flag.Bool("n", false, "Include filename in returned URL (overrides -e)")
+	flag_inclext  = flag.Bool("e", false, "Append file extension to returned URL")
 	flag_nocopy   = flag.Bool("C", false, "Do not copy link to clipboard")
 	flag_noprog   = flag.Bool("P", false, "Do not show progress bar")
 	flag_oops     = flag.Bool("oops", false, "Delete the last file uploaded")
@@ -390,6 +391,8 @@ func postFile(conf *Config, upload FileUpload) string {
 	u := msg.URL
 	if *flag_inclname {
 		u = path.Join(u, upload.Name)
+	} else if *flag_inclext {
+		u += filepath.Ext(upload.Name)
 	}
 	u = conf.Scheme + "://" + u
 	return u
