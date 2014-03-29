@@ -242,12 +242,12 @@ func (files *FileList) pruneOldest(conf *Config) {
 	}
 }
 
-func (files *FileList) pruneNewest(conf *Config) error {
+func (files *FileList) pruneNewest(conf *Config) (string, error) {
 	files.Lock()
 	defer files.Unlock()
 
 	if len(files.Files) == 0 {
-		return nil
+		return "", nil
 	}
 
 	var newest os.FileInfo
@@ -263,7 +263,7 @@ func (files *FileList) pruneNewest(conf *Config) error {
 		}
 	}
 
-	return files.remove(conf, newestId)
+	return newestId, files.remove(conf, newestId)
 }
 
 type byModtime []string
@@ -600,9 +600,14 @@ func deleteFile(g *gas.Gas) (int, gas.Outputter) {
 func oops(g *gas.Gas) (int, gas.Outputter) {
 	conf := g.Data("conf").(*Config)
 
-	if err := fileList.pruneNewest(conf); err != nil {
+	pruned, err := fileList.pruneNewest(conf)
+	if err != nil {
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 
-	return 204, nil
+	host := conf.Host
+	if host == "" {
+		host = g.Request.Host
+	}
+	return 200, out.JSON(&Resp{URL: path.Join(host, pruned)})
 }

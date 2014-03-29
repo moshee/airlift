@@ -130,6 +130,7 @@ func main() {
 		if u == "" {
 			return
 		}
+		fmt.Println(u)
 		urls = append(urls, u)
 	}
 
@@ -223,7 +224,11 @@ func oops(conf *Config) {
 		fatal(err)
 	}
 
-	conf.TryRequest(requestMaker(req), http.StatusNoContent)
+	resp := conf.TryRequest(requestMaker(req), http.StatusOK)
+	u := resp.URL
+	if u != "" {
+		fmt.Fprintf(os.Stderr, "Deleted upload at %s://%s.\n", conf.Scheme, u)
+	}
 }
 
 func remove(conf *Config, id string) {
@@ -387,6 +392,5 @@ func postFile(conf *Config, upload FileUpload) string {
 		u = path.Join(u, upload.Name)
 	}
 	u = conf.Scheme + "://" + u
-	fmt.Println(u)
 	return u
 }
