@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -35,6 +36,7 @@ var (
 		Port: 60606,
 	}
 	configLock sync.RWMutex
+	flagPort   = flag.Int("p", 0, "Override port in config")
 )
 
 func init() {
@@ -44,6 +46,7 @@ func init() {
 	}
 	appDir = filepath.Join(u.HomeDir, ".airlift-server")
 	defaultConfig.Directory = filepath.Join(appDir, "uploads")
+	flag.Parse()
 }
 
 func main() {
@@ -73,8 +76,10 @@ func main() {
 		r.Use(redirectTLS)
 	}
 
-	if conf.Port <= 0 {
-		gas.Env.Port = conf.Port
+	gas.Env.Port = conf.Port
+
+	if *flagPort > 0 {
+		gas.Env.Port = *flagPort
 	}
 
 	r.UseMore(out.CheckReroute).
