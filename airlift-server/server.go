@@ -92,6 +92,7 @@ func main() {
 		Post("/oops", checkPassword, oops).
 		Delete("/{id}", checkPassword, deleteFile).
 		Get("/{id}/{filename}", checkConfig, getFile).
+		Get("/{id}.{ext}", checkConfig, getFile).
 		Get("/{id}", checkConfig, getFile).
 		Ignition()
 }
