@@ -78,7 +78,11 @@ and path.
 
 If you are proxying the server behind a frontend at a certain subdirectory,
 make sure you rewrite the leading path out of the request URL so that the URLs
-sent to `airlift-server` are rooted.
+sent to `airlift-server` are rooted. Unfortunately, since URLs are rewritten,
+the redirecting behavior of /login and /config won't work properly, so you'll
+have to do your configuration on the internal port (60606 or whatever). Could
+use a meta redirect instead of internal redirect to fix this, but that doesn't
+play well with how sessions and stuff are set up in here.
 
 Leaving the host field empty will cause the server to return whatever host the
 file was posted to.
