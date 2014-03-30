@@ -44,7 +44,20 @@ I haven't tried to build or run it on Windows, YMMV. Works on OS X and
 GNU+Linux.
 
 `go get` should clone this repo along with any dependencies and place it
-in your `$GOPATH`. The binary produced by `go build` will be in your working
+in your `$GOPATH`, which should be set (see [here][GOPATH] for more info).
+This can be anywhere that isn't `$GOROOT`; you can set it to any arbitrary
+place like `~/go`. Assuming that's what it is, then
+
+```
+~/go/src/github.com/moshee/airlift-server$ go build
+~/go/src/github.com/moshee/airlift-server$ ./airlift-server
+```
+
+to build and run.
+
+[GOPATH]: https://code.google.com/p/go-wiki/wiki/GOPATH
+
+The binary produced by `go build` will be in your working
 directory at the moment you built it. By default, `go get` will install the
 binary to `$GOPATH/bin` after building. It isn't very useful there, because...
 
