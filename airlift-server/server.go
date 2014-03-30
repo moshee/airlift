@@ -88,9 +88,9 @@ func main() {
 		Post("/login", checkConfig, postLogin).
 		Get("/config", checkConfig, getConfig).
 		Post("/config", checkConfig, postConfig).
-		Post("/upload/file", checkPassword, postFile).
-		Post("/oops", checkPassword, oops).
-		Delete("/{id}", checkPassword, deleteFile).
+		Post("/upload/file", checkConfig, checkPassword, postFile).
+		Post("/oops", checkConfig, checkPassword, oops).
+		Delete("/{id}", checkConfig, checkPassword, deleteFile).
 		Get("/{id}/{filename}", checkConfig, getFile).
 		Get("/{id}.{ext}", checkConfig, getFile).
 		Get("/{id}", checkConfig, getFile).
@@ -107,9 +107,6 @@ func checkConfig(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func checkPassword(g *gas.Gas) (int, gas.Outputter) {
-	if code, o := checkConfig(g); code != 0 {
-		return code, o
-	}
 	conf := g.Data("conf").(*Config)
 
 	if conf.Password != nil {
