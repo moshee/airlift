@@ -100,6 +100,7 @@ func main() {
 func checkConfig(g *gas.Gas) (int, gas.Outputter) {
 	conf, err := loadConfig()
 	if err != nil {
+		log.Fatalln(g.Request.Method, "checkConfig:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 	g.SetData("conf", conf)
@@ -176,30 +177,29 @@ func (files *FileList) get(id string) string {
 // uploads, adds the file to the in-memory list, and returns the generated
 // hash.
 func (files *FileList) put(conf *Config, content io.Reader, filename string) (string, error) {
-	tmp, err := ioutil.TempFile("", "airlift-upload")
+	dest := filepath.Join(conf.Directory, filename)
+	destFile, err := os.OpenFile(dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
+		os.Remove(dest)
 		return "", err
 	}
 
-	defer tmp.Close()
+	defer destFile.Close()
 
-	// download file from client to a temp file, taking the sha3 at the same
-	// time
-	tmpname := tmp.Name()
 	sha := sha3.NewKeccak256()
-	w := io.MultiWriter(tmp, sha)
+	w := io.MultiWriter(destFile, sha)
 	io.Copy(w, content)
 	hash := makeHash(sha.Sum(nil))
 
-	// build the ID and URL and move the temp file to the correct location
-	destName := hash + "." + filename
-	dest := filepath.Join(conf.Directory, destName)
-	if err = os.Rename(tmpname, dest); err != nil {
-		os.Remove(tmpname)
+	destPath := filepath.Join(conf.Directory, hash+"."+filename)
+	if err := os.Rename(dest, destPath); err != nil {
+		os.Remove(dest)
 		return "", err
 	}
-	fi, err := os.Stat(dest)
+
+	fi, err := os.Stat(destPath)
 	if err != nil {
+		os.Remove(dest)
 		return "", err
 	}
 
@@ -472,6 +472,7 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	path := filepath.Join(appDir, "config")
 	err = writeConfig(conf, path)
 	if err != nil {
+		log.Fatalln(g.Request.Method, "postConfig:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 
@@ -511,6 +512,7 @@ func postLogin(g *gas.Gas) (int, gas.Outputter) {
 
 func getLogout(g *gas.Gas) (int, gas.Outputter) {
 	if err := auth.SignOut(g); err != nil {
+		log.Fatalln(g.Request.Method, "getLogout:", err)
 		return 500, out.Error(g, err)
 	}
 	return 302, out.Redirect("/login")
@@ -550,6 +552,7 @@ func postFile(g *gas.Gas) (int, gas.Outputter) {
 
 	hash, err := fileList.put(conf, g.Body, filename)
 	if err != nil {
+		log.Fatalln(g.Request.Method, "postFile:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 
@@ -589,6 +592,7 @@ func deleteFile(g *gas.Gas) (int, gas.Outputter) {
 	fileList.Lock()
 	defer fileList.Unlock()
 	if err := fileList.remove(conf, id); err != nil {
+		log.Fatalln(g.Request.Method, "deleteFile:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 
@@ -600,6 +604,7 @@ func oops(g *gas.Gas) (int, gas.Outputter) {
 
 	pruned, err := fileList.pruneNewest(conf)
 	if err != nil {
+		log.Fatalln(g.Request.Method, "oops:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 
