@@ -419,14 +419,14 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	conf.Directory = g.FormValue("directory")
 
 	if conf.Password == nil {
-		pass := g.FormValue("password")
+		pass := g.FormValue("newpass")
 		if pass == "" {
 			return 400, out.JSON(&Resp{Err: "cannot set empty password"})
 		} else {
 			conf.setPass(pass)
 		}
 	} else {
-		got := g.FormValue("oldpass")
+		got := g.FormValue("password")
 		if got == "" {
 			return 403, out.JSON(&Resp{Err: "you forgot your password"})
 		}

@@ -21,13 +21,13 @@
       <label for="directory">Directory</label>
       <input type="text" id="directory" name="directory" value="{{ .Directory }}" placeholder="/home/user/uploads">
     </div>
-    <div class="box" id="password-box" data-tooltip="Enter a new password here to change your password." data-tt-pos="right">
-      <label for="password">New password</label>
-      <input type="password" id="password" name="password">
+    <div class="box" id="newpass-box" data-tooltip="Enter a new password here to change your password." data-tt-pos="right">
+      <label for="newpass">New password</label>
+      <input type="password" id="newpass" name="newpass">
     </div>
-    <div class="box" id="oldpass-box" data-tooltip="Whatever changes you make, enter your current password here to make sure that you're you. If you haven't set a password yet, though, you don't have to fill it out." data-tt-pos="left">
-      <label for="oldpass">Current password</label>
-      <input type="password" id="oldpass" name="oldpass" required placeholder="Required">
+    <div class="box" id="password-box" data-tooltip="Whatever changes you make, enter your current password here to make sure that you're you. If you haven't set a password yet, though, you don't have to fill it out." data-tt-pos="left">
+      <label for="password">Current password</label>
+      <input type="password" id="password" name="password" required placeholder="Required">
     </div>
     <hr>
     <button id="submit" type="button">Update configuration</button>
@@ -49,11 +49,11 @@
         var x = new XMLHttpRequest();
 
         x.addEventListener('load', function(e) {
-          $('#oldpass').value = '';
+          $('#password').value = '';
           for (var i = 0, button; button = buttons[i]; i++) button.removeAttribute('disabled');
           if (e.target.status === 204) {
             showMessage('Configuration updated.', 'good');
-            $('#password').value = '';
+            $('#newpass').value = '';
             timeout = window.setTimeout(hideMessage, 5000);
           } else {
             var resp = JSON.parse(x.responseText);
