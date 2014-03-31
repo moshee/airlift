@@ -384,7 +384,7 @@ func postFile(conf *Config, upload FileUpload) string {
 			fatal(err)
 		}
 
-		req.Header.Set("X-Airlift-Filename", upload.Name)
+		req.Header.Set("X-Airlift-Filename", url.QueryEscape(upload.name))
 		return req
 	}, http.StatusCreated)
 

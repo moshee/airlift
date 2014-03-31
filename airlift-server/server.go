@@ -526,8 +526,10 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	}
 
 	if g.Arg("filename") == "" {
-		filename := url.QueryEscape(strings.SplitN(file, ".", 2)[1])
-		g.Header().Set("Content-Disposition", "filename="+filename)
+		filename := strings.SplitN(file, ".", 2)[1]
+		encoded := strings.Replace(url.QueryEscape(filename), "+", "%20", -1)
+		disposition := fmt.Sprintf("filename*=UTF-8''%s; filename=%s", encoded, encoded)
+		g.Header().Set("Content-Disposition", disposition)
 	}
 
 	path := filepath.Join(conf.Directory, file)
@@ -544,9 +546,12 @@ type Resp struct {
 func postFile(g *gas.Gas) (int, gas.Outputter) {
 	conf := g.Data("conf").(*Config)
 
-	filename := g.Request.Header.Get("X-Airlift-Filename")
+	filename, err := url.QueryUnescape(g.Request.Header.Get("X-Airlift-Filename"))
 	if filename == "" {
 		return 400, out.JSON(&Resp{Err: "missing filename header"})
+	}
+	if err != nil {
+		return 400, out.JSON(&Resp{Err: "bad format in filename header: " + err.Error()})
 	}
 	defer g.Body.Close()
 
