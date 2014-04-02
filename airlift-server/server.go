@@ -205,6 +205,11 @@ func (files *FileList) put(conf *Config, content io.Reader, filename string) (st
 
 	files.Lock()
 	defer files.Unlock()
+
+	if existing, exist := files.Files[hash]; exist {
+		base := filepath.Base(existing.Name())
+		os.Remove(filepath.Join(conf.Directory, base))
+	}
 	files.Files[hash] = fi
 	files.Size += fi.Size()
 
