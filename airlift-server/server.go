@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"code.google.com/p/go.crypto/sha3"
 
@@ -29,13 +30,16 @@ import (
 )
 
 var (
-	appDir        string
+	appDir        string // the place where all the stuff is stored
+	confPath      string // path of config file
 	fileList      *FileList
 	defaultConfig = Config{
 		Host: "",
 		Port: 60606,
 	}
-	configLock sync.RWMutex
+	configChan = make(chan *Config)
+	reloadChan = make(chan struct{})
+	errChan    = make(chan error)
 	flagPort   = flag.Int("p", 0, "Override port in config")
 )
 
@@ -46,7 +50,12 @@ func init() {
 	}
 	appDir = filepath.Join(u.HomeDir, ".airlift-server")
 	defaultConfig.Directory = filepath.Join(appDir, "uploads")
+	confPath = filepath.Join(appDir, "config")
 	flag.Parse()
+
+	gas.Hook(syscall.SIGUSR2, func() {
+		reloadChan <- struct{}{}
+	})
 }
 
 func main() {
@@ -58,17 +67,17 @@ func main() {
 
 	auth.UseSessionStore(store)
 
-	conf, err := loadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
+	go configServer()
 
+	conf := <-configChan
+
+	var err error
 	fileList, err = conf.loadFiles()
 	if err != nil {
 		log.Fatalln("loading files:", err)
 	}
 
-	go fileList.watchAges(conf)
+	go fileList.watchAges()
 
 	r := gas.New()
 
@@ -85,30 +94,20 @@ func main() {
 	r.UseMore(out.CheckReroute).
 		Get("/login", getLogin).
 		Get("/logout", getLogout).
-		Post("/login", checkConfig, postLogin).
-		Get("/config", checkConfig, getConfig).
-		Post("/config", checkConfig, postConfig).
-		Post("/upload/file", checkConfig, checkPassword, postFile).
-		Post("/oops", checkConfig, checkPassword, oops).
-		Delete("/{id}", checkConfig, checkPassword, deleteFile).
-		Get("/{id}/{filename}", checkConfig, getFile).
-		Get("/{id}.{ext}", checkConfig, getFile).
-		Get("/{id}", checkConfig, getFile).
+		Post("/login", postLogin).
+		Get("/config", getConfig).
+		Post("/config", postConfig).
+		Post("/upload/file", checkPassword, postFile).
+		Post("/oops", checkPassword, oops).
+		Delete("/{id}", checkPassword, deleteFile).
+		Get("/{id}/{filename}", getFile).
+		Get("/{id}.{ext}", getFile).
+		Get("/{id}", getFile).
 		Ignition()
 }
 
-func checkConfig(g *gas.Gas) (int, gas.Outputter) {
-	conf, err := loadConfig()
-	if err != nil {
-		log.Println(g.Request.Method, "checkConfig:", err)
-		return 500, out.JSON(&Resp{Err: err.Error()})
-	}
-	g.SetData("conf", conf)
-	return g.Continue()
-}
-
 func checkPassword(g *gas.Gas) (int, gas.Outputter) {
-	conf := g.Data("conf").(*Config)
+	conf := <-configChan
 
 	if conf.Password != nil {
 		pass := g.Request.Header.Get("X-Airlift-Password")
@@ -281,8 +280,9 @@ func (s byModtime) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (files *FileList) watchAges(conf *Config) {
+func (files *FileList) watchAges() {
 	for {
+		conf := <-configChan
 		before := time.Now()
 		if conf.MaxAge > 0 {
 			cutoff := before.Add(-time.Duration(conf.MaxAge) * 24 * time.Hour)
@@ -353,18 +353,47 @@ func (c *Config) setPass(pass string) {
 	c.Password = auth.Hash([]byte(pass), c.Salt)
 }
 
+func configServer() {
+	sharedConf, err := loadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		select {
+		case conf := <-configChan:
+			err = writeConfig(conf)
+			errChan <- err
+			if err != nil {
+				log.Printf("Failed to write config: %v", err)
+			} else {
+				log.Printf("Config updated on disk.")
+				sharedConf = conf
+			}
+		case configChan <- sharedConf:
+		case <-reloadChan:
+			conf, err := loadConfig()
+			if err != nil {
+				log.Printf("Failed to reload config: %v", err)
+			} else {
+				log.Print("Reloaded config.")
+				sharedConf = conf
+			}
+		}
+	}
+}
+
 func loadConfig() (*Config, error) {
 	if err := os.MkdirAll(appDir, os.FileMode(0700)); err != nil {
 		return nil, err
 	}
 	var conf Config
 
-	confPath := filepath.Join(appDir, "config")
 	confFile, err := os.Open(confPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			conf = defaultConfig
-			err = writeConfig(&conf, confPath)
+			err = writeConfig(&conf)
 			if err != nil {
 				return nil, err
 			}
@@ -372,8 +401,6 @@ func loadConfig() (*Config, error) {
 			return nil, fmt.Errorf("reading config: %v", err)
 		}
 	} else {
-		configLock.RLock()
-		defer configLock.RUnlock()
 		b, err := ioutil.ReadAll(confFile)
 		if err != nil {
 			return nil, fmt.Errorf("reading config: %v", err)
@@ -387,14 +414,12 @@ func loadConfig() (*Config, error) {
 	return &conf, nil
 }
 
-func writeConfig(conf *Config, to string) error {
+func writeConfig(conf *Config) error {
 	b, err := json.MarshalIndent(conf, "", "    ")
 	if err != nil {
 		return fmt.Errorf("encoding config: %v", err)
 	}
-	configLock.Lock()
-	defer configLock.Unlock()
-	file, err := os.OpenFile(to, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(0600))
+	file, err := os.OpenFile(confPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(0600))
 	if err != nil {
 		return fmt.Errorf("writing config: %v", err)
 	}
@@ -404,7 +429,7 @@ func writeConfig(conf *Config, to string) error {
 }
 
 func getConfig(g *gas.Gas) (int, gas.Outputter) {
-	conf := g.Data("conf").(*Config)
+	conf := <-configChan
 
 	// if there's a password set, only allow user into config if they're logged
 	// in, otherwise it's probably the first run and they need to enter one
@@ -418,7 +443,7 @@ func getConfig(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func postConfig(g *gas.Gas) (int, gas.Outputter) {
-	conf := g.Data("conf").(*Config)
+	conf := <-configChan
 
 	conf.Host = g.FormValue("host")
 	conf.Directory = g.FormValue("directory")
@@ -474,9 +499,8 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 		conf.MaxSize = size
 	}
 
-	path := filepath.Join(appDir, "config")
-	err = writeConfig(conf, path)
-	if err != nil {
+	configChan <- conf
+	if err := <-errChan; err != nil {
 		log.Println(g.Request.Method, "postConfig:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
@@ -501,7 +525,7 @@ func getLogin(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func postLogin(g *gas.Gas) (int, gas.Outputter) {
-	conf := g.Data("conf").(*Config)
+	conf := <-configChan
 	var path string
 	ok := out.Recover(g, &path) == nil
 
@@ -524,7 +548,7 @@ func getLogout(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func getFile(g *gas.Gas) (int, gas.Outputter) {
-	conf := g.Data("conf").(*Config)
+	conf := <-configChan
 	file := fileList.get(g.Arg("id"))
 	if file == "" {
 		return 404, out.Error(g, errors.New("ID not found"))
@@ -549,7 +573,7 @@ type Resp struct {
 }
 
 func postFile(g *gas.Gas) (int, gas.Outputter) {
-	conf := g.Data("conf").(*Config)
+	conf := <-configChan
 
 	filename, err := url.QueryUnescape(g.Request.Header.Get("X-Airlift-Filename"))
 	if filename == "" {
@@ -592,7 +616,7 @@ func makeHash(hash []byte) string {
 }
 
 func deleteFile(g *gas.Gas) (int, gas.Outputter) {
-	conf := g.Data("conf").(*Config)
+	conf := <-configChan
 
 	id := g.Arg("id")
 	if id == "" {
@@ -610,7 +634,7 @@ func deleteFile(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func oops(g *gas.Gas) (int, gas.Outputter) {
-	conf := g.Data("conf").(*Config)
+	conf := <-configChan
 
 	pruned, err := fileList.pruneNewest(conf)
 	if err != nil {
