@@ -190,6 +190,11 @@ func (files *FileList) put(conf *Config, content io.Reader, filename string) (st
 	io.Copy(w, content)
 	hash := makeHash(sha.Sum(nil))
 
+	if existing, exist := files.Files[hash]; exist {
+		base := filepath.Base(existing.Name())
+		os.Remove(filepath.Join(conf.Directory, base))
+	}
+
 	destPath := filepath.Join(conf.Directory, hash+"."+filename)
 	if err := os.Rename(dest, destPath); err != nil {
 		os.Remove(dest)
@@ -204,11 +209,6 @@ func (files *FileList) put(conf *Config, content io.Reader, filename string) (st
 
 	files.Lock()
 	defer files.Unlock()
-
-	if existing, exist := files.Files[hash]; exist {
-		base := filepath.Base(existing.Name())
-		os.Remove(filepath.Join(conf.Directory, base))
-	}
 	files.Files[hash] = fi
 	files.Size += fi.Size()
 
