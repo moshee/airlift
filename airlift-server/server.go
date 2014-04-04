@@ -561,6 +561,9 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 		g.Header().Set("Content-Disposition", disposition)
 	}
 
+	threeMonthsFromNow := time.Now().Add(time.Hour * 24 * 30 * 3)
+	g.Header().Set("Expires", threeMonthsFromNow.Format(http.TimeFormat))
+
 	path := filepath.Join(conf.Directory, file)
 	http.ServeFile(g, g.Request, path)
 
