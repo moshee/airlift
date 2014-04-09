@@ -563,6 +563,7 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 
 	threeMonthsFromNow := time.Now().Add(time.Hour * 24 * 30 * 3)
 	g.Header().Set("Expires", threeMonthsFromNow.Format(http.TimeFormat))
+	g.Header().Set("Cache-Control", "public") // enable browser caching for resources behind TLS
 
 	path := filepath.Join(conf.Directory, file)
 	http.ServeFile(g, g.Request, path)
