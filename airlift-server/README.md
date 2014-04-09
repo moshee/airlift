@@ -105,7 +105,8 @@ that many days will be automatically deleted.
 will be pruned on every new upload until the total size is less than that many
 megabytes.
 
-You may have to restart the server after modifying the configuration.
+If you manually edit the config file while the server is running, you should
+send the server process a USR2 signal to force a config reload.
 
 If the server fails to start with a config error, you probably want to delete
 `~/.airlift-server/config` and reconfigure from scratch.
