@@ -92,6 +92,7 @@ func main() {
 		Post("/config", postConfig).
 		Post("/upload/file", checkPassword, postFile).
 		Post("/oops", checkPassword, oops).
+		Get("/l", checkPassword, getList).
 		Delete("/{id}", checkPassword, deleteFile).
 		Get("/{id}/{filename}", getFile).
 		Get("/{id}.{ext}", getFile).
@@ -339,4 +340,38 @@ func oops(g *gas.Gas) (int, gas.Outputter) {
 		host = g.Request.Host
 	}
 	return 200, out.JSON(&Resp{URL: path.Join(host, pruned)})
+}
+
+type File struct {
+	ID       string
+	Name     string
+	Uploaded time.Time
+}
+
+func getList(g *gas.Gas) (int, gas.Outputter) {
+	ids := fileList.sortedIds()
+	limit, err := strconv.Atoi(g.FormValue("limit"))
+	if err != nil {
+		limit = 10
+	}
+	if limit > len(ids) || limit < 0 {
+		limit = len(ids)
+	}
+
+	fileList.Lock()
+
+	list := make([]*File, limit)
+	ids = ids[len(ids)-limit : len(ids)]
+	for i, id := range ids {
+		fi := fileList.Files[id]
+		list[len(list)-i-1] = &File{
+			ID:       id,
+			Name:     strings.SplitN(fi.Name(), ".", 2)[1],
+			Uploaded: fi.ModTime(),
+		}
+	}
+
+	fileList.Unlock()
+
+	return 200, out.JSON(list)
 }

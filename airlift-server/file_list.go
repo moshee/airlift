@@ -76,12 +76,7 @@ func (files *FileList) put(conf *Config, content io.Reader, filename string) (st
 }
 
 func (files *FileList) pruneOldest(conf *Config) {
-	ids := make([]string, 0, len(files.Files))
-	for id := range files.Files {
-		ids = append(ids, id)
-	}
-
-	sort.Sort(byModtime(ids))
+	ids := files.sortedIds()
 	pruned := int64(0)
 	n := 0
 	for i := 0; files.Size > conf.MaxSize*1024*1024 && i < len(ids); i++ {
@@ -182,4 +177,14 @@ func (files *FileList) remove(conf *Config, id string) error {
 
 	delete(files.Files, id)
 	return nil
+}
+
+func (files *FileList) sortedIds() []string {
+	ids := make([]string, 0, len(files.Files))
+	for id := range files.Files {
+		ids = append(ids, id)
+	}
+
+	sort.Sort(byModtime(ids))
+	return ids
 }
