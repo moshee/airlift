@@ -10,29 +10,42 @@
         -moz-box-sizing: border-box;
       }
       html {
+        width: 100%;
+        height: 100%;
         background: #fafafa;
+      }
+      body {
+        padding: 32px;
         display: flex;
         display: -webkit-flex;
         display: -moz-flex;
         align-content: center;
-        align-items: center;
+        align-items: top;
         justify-content: center;
+        flex-flow: row wrap;
         -webkit-align-content: center;
-        -webkit-align-items: center;
+        -webkit-align-items: top;
         -webkit-justify-content: center;
+        -webkit-flex-flow: row wrap;
         -moz-align-content: center;
-        -moz-align-items: center;
+        -moz-align-items: top;
         -moz-justify-content: center;
-        width: 100%;
-        height: 100%;
+        -moz-flex-flow: row wrap;
       }
-      body {
+      section {
         width: 512px;
         padding: 32px;
         background: #fff;
-        font-family: sans-serif;
+        font-family: clear sans,sans-serif;
         position: relative;
         border: 3px solid #eee;
+        margin: 16px;
+      }
+      section h1 {
+        text-transform: uppercase;
+        font-size: 20px;
+        color: #888;
+        margin-bottom: 16px;
       }
       a, a:visited {
         color: #a42;
@@ -69,7 +82,7 @@
         border: none;
         background: #eaeaea;
         color: #444;
-        font-family: sans-serif;
+        font-family: clear sans,sans-serif;
         margin-right: 8px;
       }
       button:hover {
@@ -94,7 +107,7 @@
         -moz-appearance: none;
         border: none;
         background: #fafafa;
-        font-family: sans-serif;
+        font-family: clear sans,sans-serif;
         font-size: 18px;
         color: #444;
         border: 1px solid #ccc;
@@ -194,6 +207,21 @@
         font-style: italic;
         color: #800;
         border-color: #c44;
+      }
+      .stat {
+        text-align: center;
+        display: inline-block;
+        margin: 0 16px 16px 0;
+        padding: 16px;
+        background: #fafafa;
+      }
+      .stat-number {
+        font-size: 36px;
+      }
+      .stat figcaption {
+        font-size: 14px;
+        color: #888;
+        font-weight: 700;
       }
     </style>
   </head>

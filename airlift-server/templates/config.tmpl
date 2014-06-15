@@ -1,38 +1,52 @@
 {{ define "config" }}
-  <form id="config">
-    <div id="help">?</div>
-    <div class="box" id="host-box" data-tooltip="This is the base host and path that the URL will be appended to and returned when you upload a file. Leave it blank to use whichever host the uploader is accessed from." data-tt-pos="top">
-      <label for="host">Base path</label>
-      <input type="text" id="host" name="host" value="{{ .Host }}" placeholder="i.example.com">
-    </div>
-    <div class="box" id="port-box" data-tooltip="This is the port that the server will listen on. You can set it to something other than 80 and set up a proxy with your existing web server." data-tt-pos="right">
-      <label for="port">Port</label>
-      <input type="text" id="port" name="port" value="{{ .Port }}" placeholder="80">
-    </div>
-    <div class="box" id="max-age-box" data-tooltip="This is the maximum age of an upload in days. Uploads will be automatically pruned when they reach this age. If left blank or ≤0, no pruning will happen." data-tt-pos="left">
-      <label for="max-age">Max upload age (days)</label>
-      <input type="number" id="max-age" name="max-age" value="{{ .MaxAge }}" min="0">
-    </div>
-    <div class="box" id="max-size-box" data-tooltip="This is the maximum size of the uploads folder in megabytes. The oldest uploads will be pruned whenever the size reaches this value. If left blank or ≤0, no pruning will happen." data-tt-pos="right">
-      <label for="max-size">Max uploads size (MB)</label>
-      <input type="number" id="max-size" name="max-size" value="{{ .MaxSize }}" min="0">
-    </div>
-    <div class="box" id="directory-box" data-tooltip="This is the directory on the server in which the uploaded files will reside." data-tt-pos="left">
-      <label for="directory">Directory</label>
-      <input type="text" id="directory" name="directory" value="{{ .Directory }}" placeholder="/home/user/uploads">
-    </div>
-    <div class="box" id="newpass-box" data-tooltip="Enter a new password here to change your password." data-tt-pos="right">
-      <label for="newpass">New password</label>
-      <input type="password" id="newpass" name="newpass">
-    </div>
-    <div class="box" id="password-box" data-tooltip="Whatever changes you make, enter your current password here to make sure that you're you. If you haven't set a password yet, though, you don't have to fill it out." data-tt-pos="left">
-      <label for="password">Current password</label>
-      <input type="password" id="password" name="password" required placeholder="Required">
-    </div>
-    <hr>
-    <button id="submit" type="button">Update configuration</button>
-    <a href="/logout">Log out</a>
-  </form>
+  <section id="section-config">
+    <h1>Configuration</h1>
+    <form id="config">
+      <div id="help">?</div>
+      <div class="box" id="host-box" data-tooltip="This is the base host and path that the URL will be appended to and returned when you upload a file. Leave it blank to use whichever host the uploader is accessed from." data-tt-pos="top">
+        <label for="host">Base path</label>
+        <input type="text" id="host" name="host" value="{{ .Conf.Host }}" placeholder="i.example.com">
+      </div>
+      <div class="box" id="port-box" data-tooltip="This is the port that the server will listen on. You can set it to something other than 80 and set up a proxy with your existing web server." data-tt-pos="right">
+        <label for="port">Port</label>
+        <input type="text" id="port" name="port" value="{{ .Conf.Port }}" placeholder="80">
+      </div>
+      <div class="box" id="max-age-box" data-tooltip="This is the maximum age of an upload in days. Uploads will be automatically pruned when they reach this age. If left blank or ≤0, no pruning will happen." data-tt-pos="left">
+        <label for="max-age">Max upload age (days)</label>
+        <input type="number" id="max-age" name="max-age" value="{{ .Conf.MaxAge }}" min="0">
+      </div>
+      <div class="box" id="max-size-box" data-tooltip="This is the maximum size of the uploads folder in megabytes. The oldest uploads will be pruned whenever the size reaches this value. If left blank or ≤0, no pruning will happen." data-tt-pos="right">
+        <label for="max-size">Max uploads size (MB)</label>
+        <input type="number" id="max-size" name="max-size" value="{{ .Conf.MaxSize }}" min="0">
+      </div>
+      <div class="box" id="directory-box" data-tooltip="This is the directory on the server in which the uploaded files will reside." data-tt-pos="left">
+        <label for="directory">Directory</label>
+        <input type="text" id="directory" name="directory" value="{{ .Conf.Directory }}" placeholder="/home/user/uploads">
+      </div>
+      <div class="box" id="newpass-box" data-tooltip="Enter a new password here to change your password." data-tt-pos="right">
+        <label for="newpass">New password</label>
+        <input type="password" id="newpass" name="newpass">
+      </div>
+      <div class="box" id="password-box" data-tooltip="Whatever changes you make, enter your current password here to make sure that you're you. If you haven't set a password yet, though, you don't have to fill it out." data-tt-pos="left">
+        <label for="password">Current password</label>
+        <input type="password" id="password" name="password" required placeholder="Required">
+      </div>
+      <hr>
+      <button id="submit" type="button">Update configuration</button>
+      <a href="/logout">Log out</a>
+    </form>
+  </section>
+  <section id="section-stats">
+    <h1>Stats</h1>
+    <figure class="stat" title="{{ .NumUploads.Raw }} uploads">
+      <div class="stat-number">{{ .NumUploads }}</div>
+      <figcaption>Uploads</figcaption>
+    </figure>
+    <figure class="stat" title="{{ .UploadsSize }} of uploads in total">
+      <div class="stat-number">{{ .UploadsSize }}</div>
+      <figcaption>Total filesize</figcaption>
+    </figure>
+  </section>
   <script>
     function $(sel) { return document.querySelector(sel); }
     function $$(sel) { return document.querySelectorAll(sel); }
@@ -90,10 +104,12 @@
 {{ end }}
 
 {{ define "login" }}
-  <form method="post" action="/login" id="login">
-    {{ if . }}<p id="message-box" class="bad">Incorrect password.</p>{{ end }}
-    <label for="password">Password: </label><input name="pass" id="password" type="password" placeholder="password" autofocus required>
-    <hr>
-    <button type="submit" id="submit">Log in</button>
-  </form>
+  <section>
+    <form method="post" action="/login" id="login">
+      {{ if . }}<p id="message-box" class="bad">Incorrect password.</p>{{ end }}
+      <label for="password">Password: </label><input name="pass" id="password" type="password" placeholder="password" autofocus required>
+      <hr>
+      <button type="submit" id="submit">Log in</button>
+    </form>
+  </section>
 {{ end }}
