@@ -90,7 +90,7 @@
       if (box == null) {
         box = document.createElement('div');
         box.id = 'message-box';
-        document.body.insertBefore(box, $('#config'));
+        $('#section-config').insertBefore(box, $('#config'));
       }
       box.className = classname;
       box.innerText = msg;
