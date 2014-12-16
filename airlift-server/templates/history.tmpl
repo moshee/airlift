@@ -1,0 +1,50 @@
+{{ define "history" }}
+<section id="history">
+  <a href="/config">Back to config</a>
+  <ul>
+    {{ range .List }}
+    <li class="history-item" data-id="{{ .ID }}">
+    <a href="/{{ .ID }}" class="upload-link">{{ if .HasThumb }}<img src="/thumb/{{ .ID }}.jpg">{{ else }}<img src="/static/file.svg"><div class="file-ext-overlay">{{ .Ext }}</div>{{ end }}</a>
+      <div class="history-item-name" title="{{ .Name }}">{{ .Name }}</div>
+      <div class="history-item-data">{{ .Size }} / <span title="{{ .Uploaded.Format "2006-01-02 15:04:05 MST" }}">{{ .Ago }}</span> ago</div>
+      <div class="history-item-data"><a href="javascript:" class="delete-upload">Delete</a></div>
+    </li>
+    {{ end }}
+  </ul>
+  <nav id="pagination">
+    {{ if ne .CurrentPage 0 }}<a href="/history/{{ .PrevPage }}">Back</a> — {{ end }}
+    <sup>{{ .CurrentPage }}</sup>&frasl;<sub>{{ .TotalPages }}</sub>
+    {{ if ne .NextPage 0 }} — <a href="/history/{{ .NextPage }}">Next</a>{{ end }}
+  </nav>
+</section>
+<script>
+  window.addEventListener('DOMContentLoaded', function() {
+    var items = $$('.history-item');
+    for (var i = 0, item; item = items[i]; i++) {
+      (function(item) {
+        item.querySelector('a.delete-upload').addEventListener('click', function() {
+          item.style.opacity = '0.5';
+          var x = new XMLHttpRequest();
+
+          x.addEventListener('load', function(e) {
+            if (e.target.status == 204) {
+              item.parentNode.removeChild(item);
+            } else {
+              item.style.opacity = '';
+              var resp = JSON.parse(x.responseText);
+              if (resp != null && resp.Err != null) {
+                alert('error: ' + resp.Err);
+              } else {
+                alert('wat');
+              }
+            }
+          });
+
+          x.open('POST', '/delete/' + item.dataset.id, true);
+          x.send();
+        }, false);
+      })(item);
+    }
+  }, true);
+</script>
+{{ end }}

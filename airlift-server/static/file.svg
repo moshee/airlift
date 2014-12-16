@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [
+	<!ENTITY st0 "fill:url(#SVGID_1_);">
+	<!ENTITY st1 "fill:#ABABAB;">
+	<!ENTITY st2 "fill:url(#SVGID_2_);">
+]>
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="100px" height="100px" viewBox="0 0 100 100" style="enable-background:new 0 0 100 100;" xml:space="preserve">
+<g>
+	<linearGradient id="SVGID_1_" gradientUnits="userSpaceOnUse" x1="50" y1="98.5" x2="50" y2="1.5">
+		<stop  offset="0" style="stop-color:#E8E8E8"/>
+		<stop  offset="0.1339" style="stop-color:#EDEDED"/>
+		<stop  offset="0.5859" style="stop-color:#FBFBFB"/>
+		<stop  offset="1" style="stop-color:#FFFFFF"/>
+	</linearGradient>
+	<polygon style="&st0;" points="15.5,98.5 15.5,1.5 64.207,1.5 84.5,21.793 84.5,98.5 	"/>
+	<path style="&st1;" d="M64,2l20,20v76H16V2H64 M64.414,1H64H16h-1v1v96v1h1h68h1v-1V22v-0.414l-0.293-0.293l-20-20L64.414,1
+		L64.414,1z"/>
+</g>
+<g>
+	
+		<linearGradient id="SVGID_2_" gradientUnits="userSpaceOnUse" x1="74.0732" y1="22.3535" x2="74.0732" y2="1.5" gradientTransform="matrix(-1 0 0 -1 148 24)">
+		<stop  offset="0" style="stop-color:#DEDEDE"/>
+		<stop  offset="0.2894" style="stop-color:#EDEDED"/>
+		<stop  offset="0.6602" style="stop-color:#FBFBFB"/>
+		<stop  offset="1" style="stop-color:#FFFFFF"/>
+	</linearGradient>
+	<polygon style="&st2;" points="63.5,22.5 63.5,2 64.354,1.646 84.354,21.646 84,22.5 	"/>
+	<path style="&st1;" d="M64,2l20,20H64V2 M64.707,1.293L63,2v20v1h1h20l0.707-1.707L64.707,1.293L64.707,1.293z"/>
+</g>
+</svg>

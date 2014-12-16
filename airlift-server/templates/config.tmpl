@@ -1,5 +1,10 @@
 {{ define "config" }}
-  <section id="section-config">
+  <section id="section-overview" class="floating-section">
+    <h1>Overview</h1>
+    <p><strong><a href="/history/0">{{ .NumUploads }} uploads</a></strong> totalling {{ .UploadsSize }}. (<a href="javascript:purgeAll()">purge</a>)</p>
+    <p>Thumbnail cache is {{ .ThumbsSize }}. (<a href="javascript:purgeThumbs()">purge</a>)</p>
+  </section>
+  <section id="section-config" class="floating-section">
     <h1>Configuration</h1>
     <form id="config">
       <div id="help">?</div>
@@ -36,22 +41,7 @@
       <a href="/logout">Log out</a>
     </form>
   </section>
-  <section id="section-stats">
-    <h1>Stats</h1>
-    <figure class="stat" title="{{ .NumUploads.Raw }} uploads">
-      <div class="stat-number">{{ .NumUploads }}</div>
-      <figcaption>Uploads</figcaption>
-    </figure>
-    <figure class="stat" title="{{ .UploadsSize }} of uploads in total">
-      <div class="stat-number">{{ .UploadsSize }}</div>
-      <figcaption>Total filesize</figcaption>
-    </figure>
-  </section>
   <script>
-    function $(sel) { return document.querySelector(sel); }
-    function $$(sel) { return document.querySelectorAll(sel); }
-    var timeout;
-
     window.addEventListener('load', function() {
       var buttons = $$('button');
 
@@ -59,7 +49,7 @@
         for (var i = 0, button; button = buttons[i]; i++) button.setAttribute('disabled', true);
         var host = $('#host');
         host.value = host.value.replace(/\w+:\/\//, '');
-        var fd = new FormData($('#config'));
+          var fd = new FormData($('#config'));
         var x = new XMLHttpRequest();
 
         x.addEventListener('load', function(e) {
@@ -72,9 +62,9 @@
           } else {
             var resp = JSON.parse(x.responseText);
             if (resp != null && resp.Err != null) {
-              showMessage('Error: ' + resp.Err, 'bad');
+              showMessage($('#section-config'), 'Error: ' + resp.Err, 'bad');
             } else {
-              showMessage('An unknown error occurred (status ' + e.target.status + ')', 'bad');
+              showMessage($('#section-config'), 'An unknown error occurred (status ' + e.target.status + ')', 'bad');
             }
           }
         }, false);
@@ -83,28 +73,11 @@
         x.send(fd);
       }, false);
     }, false);
-
-    function showMessage(msg, classname) {
-      if (timeout != null) window.clearTimeout(timeout);
-      var box = $('#message-box');
-      if (box == null) {
-        box = document.createElement('div');
-        box.id = 'message-box';
-        $('#section-config').insertBefore(box, $('#config'));
-      }
-      box.className = classname;
-      box.innerText = msg;
-      box.style.display = 'block';
-    }
-
-    function hideMessage() {
-      $('#message-box').style.display = 'none';
-    }
   </script>
 {{ end }}
 
 {{ define "login" }}
-  <section>
+  <section id="section-login" class="floating-section">
     <form method="post" action="/login" id="login">
       {{ if . }}<p id="message-box" class="bad">Incorrect password.</p>{{ end }}
       <label for="password">Password: </label><input name="pass" id="password" type="password" placeholder="password" autofocus required>

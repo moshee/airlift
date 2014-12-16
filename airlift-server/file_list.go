@@ -10,12 +10,13 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/go.crypto/sha3"
+	"golang.org/x/crypto/sha3"
 )
 
 type FileList struct {
 	Files map[string]os.FileInfo
 	Size  int64
+	Base  string
 	sync.RWMutex
 }
 
@@ -30,10 +31,11 @@ func (files *FileList) get(id string) string {
 }
 
 // put creates a temp file, downloads a post body to it, moves it to the
-// uploads, adds the file to the in-memory list, and returns the generated
-// hash.
+// FileList root, adds the file to the in-memory list, and returns the
+// generated hash.
 func (files *FileList) put(conf *Config, content io.Reader, filename string) (string, error) {
-	dest := filepath.Join(conf.Directory, filename)
+	os.MkdirAll(files.Base, 0644)
+	dest := filepath.Join(files.Base, filename)
 	destFile, err := os.OpenFile(dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		os.Remove(dest)
@@ -42,17 +44,17 @@ func (files *FileList) put(conf *Config, content io.Reader, filename string) (st
 
 	defer destFile.Close()
 
-	sha := sha3.NewKeccak256()
+	sha := sha3.New256()
 	w := io.MultiWriter(destFile, sha)
 	io.Copy(w, content)
 	hash := makeHash(sha.Sum(nil))
 
 	if existing, exist := files.Files[hash]; exist {
 		base := filepath.Base(existing.Name())
-		os.Remove(filepath.Join(conf.Directory, base))
+		os.Remove(filepath.Join(files.Base, base))
 	}
 
-	destPath := filepath.Join(conf.Directory, hash+"."+filename)
+	destPath := filepath.Join(files.Base, hash+"."+filename)
 	if err := os.Rename(dest, destPath); err != nil {
 		os.Remove(dest)
 		return "", err
@@ -82,11 +84,10 @@ func (files *FileList) pruneOldest(conf *Config) {
 	for i := 0; files.Size > conf.MaxSize*1024*1024 && i < len(ids); i++ {
 		id := ids[i]
 		f := files.Files[id]
-		if err := files.remove(conf, id); err != nil {
+		if err := files.remove(id); err != nil {
 			log.Printf("pruning %s: %v", f.Name(), err)
 			continue
 		}
-		files.Size -= f.Size()
 		pruned += f.Size()
 		n++
 	}
@@ -96,7 +97,7 @@ func (files *FileList) pruneOldest(conf *Config) {
 	}
 }
 
-func (files *FileList) pruneNewest(conf *Config) (string, error) {
+func (files *FileList) pruneNewest() (string, error) {
 	files.Lock()
 	defer files.Unlock()
 
@@ -117,7 +118,7 @@ func (files *FileList) pruneNewest(conf *Config) (string, error) {
 		}
 	}
 
-	return newestId, files.remove(conf, newestId)
+	return newestId, files.remove(newestId)
 }
 
 type byModtime []string
@@ -138,7 +139,7 @@ func (files *FileList) watchAges() {
 		before := time.Now()
 		if conf.MaxAge > 0 {
 			cutoff := before.Add(-time.Duration(conf.MaxAge) * 24 * time.Hour)
-			files.pruneOld(conf, cutoff)
+			files.pruneOld(cutoff)
 		}
 		after := time.Now()
 		// execute next on the nearest day
@@ -146,13 +147,13 @@ func (files *FileList) watchAges() {
 	}
 }
 
-func (files *FileList) pruneOld(conf *Config, cutoff time.Time) {
+func (files *FileList) pruneOld(cutoff time.Time) {
 	files.Lock()
 	defer files.Unlock()
 	n := 0
 	for id, fi := range files.Files {
 		if fi.ModTime().Before(cutoff) {
-			if err := files.remove(conf, id); err != nil {
+			if err := files.remove(id); err != nil {
 				log.Printf("Error pruning %s: %v", fi.Name(), err)
 				continue
 			}
@@ -163,18 +164,19 @@ func (files *FileList) pruneOld(conf *Config, cutoff time.Time) {
 	}
 }
 
-func (files *FileList) remove(conf *Config, id string) error {
+func (files *FileList) remove(id string) error {
 	fi, ok := files.Files[id]
 	if !ok {
 		return fmt.Errorf("File id %s doesn't exist", id)
 	}
 
-	name := filepath.Join(conf.Directory, fi.Name())
+	name := filepath.Join(files.Base, fi.Name())
 	err := os.Remove(name)
 	if err != nil {
 		return err
 	}
 
+	files.Size -= fi.Size()
 	delete(files.Files, id)
 	return nil
 }
@@ -187,4 +189,21 @@ func (files *FileList) sortedIds() []string {
 
 	sort.Sort(byModtime(ids))
 	return ids
+}
+
+func (files *FileList) purge() error {
+	files.Lock()
+	defer files.Unlock()
+
+	for id, fi := range files.Files {
+		path := filepath.Join(files.Base, fi.Name())
+		s := fi.Size()
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+		files.Size -= s
+		delete(files.Files, id)
+	}
+
+	return nil
 }

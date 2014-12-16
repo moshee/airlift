@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"ktkr.us/pkg/gas/auth"
@@ -22,23 +23,35 @@ type Config struct {
 	MaxSize   int64 // max total size of uploads in MB
 }
 
-func (conf *Config) loadFiles() (*FileList, error) {
-	files := new(FileList)
+func (conf *Config) loadFiles() (files, cache *FileList, err error) {
+	files = &FileList{
+		Files: make(map[string]os.FileInfo),
+		Base:  conf.Directory,
+	}
+	cache = &FileList{
+		Files: make(map[string]os.FileInfo),
+		Base:  filepath.Join(appDir, thumbCachePath),
+	}
 	// make sure the uploads folder is there, and then load all of the file
 	// names and IDs into memory
 	os.MkdirAll(conf.Directory, os.FileMode(0700))
-	files.Files = make(map[string]os.FileInfo)
 	list, err := ioutil.ReadDir(conf.Directory)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, file := range list {
 		parts := strings.SplitN(file.Name(), ".", 2)
 		files.Files[parts[0]] = file
 		files.Size += file.Size()
+
+		thumbPath := filepath.Join(appDir, thumbCachePath, parts[0]+".jpg")
+		if fi, err := os.Stat(thumbPath); err == nil {
+			cache.Files[parts[0]] = fi
+			cache.Size += fi.Size()
+		}
 	}
 
-	return files, nil
+	return
 }
 
 // satisfies gas.User interface
@@ -73,6 +86,7 @@ func configServer() {
 			} else {
 				log.Printf("Config updated on disk.")
 				sharedConf = conf
+				fileList.Base = conf.Directory
 			}
 		case configChan <- sharedConf:
 		case <-reloadChan:
