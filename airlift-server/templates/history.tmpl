@@ -28,7 +28,11 @@
 
           x.addEventListener('load', function(e) {
             if (e.target.status == 204) {
-              item.parentNode.removeChild(item);
+              item.style.opacity = '0.0';
+              item.addEventListener('transitionend', function(e) {
+                e.target.parentNode.removeChild(e.target);
+                window.location.reload(true);
+              }, false);
             } else {
               item.style.opacity = '';
               var resp = JSON.parse(x.responseText);

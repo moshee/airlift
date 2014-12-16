@@ -224,7 +224,10 @@ input:focus {
 	bottom: 36px;
 	font-weight: 700;
 }
-
+.history-item {
+	transition: opacity;
+	transition-duration: 0.5s;
+}
 .history-item-name {
 	width: 100px;
 	white-space: nowrap;
