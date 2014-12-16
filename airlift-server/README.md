@@ -63,9 +63,10 @@ binary to `$GOPATH/bin` after building. It isn't very useful there, because...
 
 ### Usage
 
-...the server must be run with the `templates` subdirectory in its working
-directory. Whatever else you do is up to you. Just `$ ./airlift-server` to run
-it in your terminal. Use your favorite tools to background it.
+...the server must be run with the `templates` and `static` subdirectories in
+its working directory. Whatever else you do is up to you. Just
+`$ ./airlift-server` to run it in your terminal. Use your favorite tools to
+background it.
 
 When you start the server for the first time, it will generate a dotfolder in
 your home directory for local configuration. Visit
