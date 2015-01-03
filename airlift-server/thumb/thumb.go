@@ -199,7 +199,11 @@ func (c *Cache) getThumb(id string) {
 
 func (c *Cache) Purge() error {
 	c.remove <- ""
-	return (<-c.resp).(error)
+	err := <-c.resp
+	if v, ok := err.(error); ok {
+		return v
+	}
+	return nil
 }
 
 func (c *Cache) doPurge() error {
