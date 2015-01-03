@@ -1,4 +1,7 @@
 {{ define "config" }}
+  <nav id="config-nav">
+    <a href="/logout">Log out</a>
+  </nav>
   <section id="section-overview" class="floating-section">
     <h1>Overview</h1>
     <p><strong><a href="/history/0">{{ .NumUploads }} uploads</a></strong> totalling {{ .UploadsSize }}. (<a href="javascript:purgeAll()">purge</a>)</p>
@@ -38,7 +41,6 @@
       </div>
       <hr>
       <button id="submit" type="button">Update configuration</button>
-      <a href="/logout">Log out</a>
     </form>
   </section>
   <script>

@@ -13,6 +13,10 @@ body {
 	padding: 64px;
 	font-family: clear sans,sans-serif;
 }
+.floating-section, #config-nav {
+	margin: 0 auto 16px;
+	width: 512px;
+}
 .floating-section {
 	margin: 0 auto 16px;
 	width: 512px;
@@ -20,6 +24,9 @@ body {
 	background: #fff;
 	position: relative;
 	border: 3px solid #eee;
+}
+#config-nav {
+	text-align: right;
 }
 section h1 {
 	text-transform: uppercase;
