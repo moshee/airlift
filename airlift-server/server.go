@@ -18,7 +18,7 @@ import (
 	"syscall"
 	"time"
 
-	_ "net/http/pprof"
+	//_ "net/http/pprof"
 
 	"ktkr.us/pkg/airlift/airlift-server/cache"
 	"ktkr.us/pkg/airlift/airlift-server/config"
@@ -77,9 +77,11 @@ func init() {
 }
 
 func main() {
-	go func() {
-		log.Fatal(http.ListenAndServe(":6060", nil))
-	}()
+	/*
+		go func() {
+			log.Fatal(http.ListenAndServe(":6060", nil))
+		}()
+	*/
 	sessDir := filepath.Join(appDir, "sessions")
 	os.RemoveAll(sessDir)
 	store := &auth.FileStore{Root: sessDir}
