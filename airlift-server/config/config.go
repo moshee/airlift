@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"crypto/rand"
@@ -7,11 +7,27 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"ktkr.us/pkg/gas/auth"
 )
+
+var OnSave func(*Config)
+
+var (
+	configChan   = make(chan *Config)
+	reloadChan   = make(chan struct{})
+	errChan      = make(chan error)
+	sharedConfig *Config
+	confPath     string
+	Default      Config
+)
+
+func Init(filePath string) error {
+	confPath = filePath
+	var err error
+	sharedConfig, err = Load()
+	return err
+}
 
 type Config struct {
 	Host      string
@@ -21,37 +37,6 @@ type Config struct {
 	Directory string
 	MaxAge    int   // max age of uploads in days
 	MaxSize   int64 // max total size of uploads in MB
-}
-
-func (conf *Config) loadFiles() (files, cache *FileList, err error) {
-	files = &FileList{
-		Files: make(map[string]os.FileInfo),
-		Base:  conf.Directory,
-	}
-	cache = &FileList{
-		Files: make(map[string]os.FileInfo),
-		Base:  filepath.Join(appDir, thumbCachePath),
-	}
-	// make sure the uploads folder is there, and then load all of the file
-	// names and IDs into memory
-	os.MkdirAll(conf.Directory, os.FileMode(0700))
-	list, err := ioutil.ReadDir(conf.Directory)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, file := range list {
-		parts := strings.SplitN(file.Name(), ".", 2)
-		files.Files[parts[0]] = file
-		files.Size += file.Size()
-
-		thumbPath := filepath.Join(appDir, thumbCachePath, parts[0]+".jpg")
-		if fi, err := os.Stat(thumbPath); err == nil {
-			cache.Files[parts[0]] = fi
-			cache.Size += fi.Size()
-		}
-	}
-
-	return
 }
 
 // satisfies gas.User interface
@@ -64,14 +49,14 @@ func (c Config) Username() string {
 }
 
 // Update the config with the new password hash, generating a new random salt
-func (c *Config) setPass(pass string) {
+func (c *Config) SetPass(pass string) {
 	c.Salt = make([]byte, 32)
 	rand.Read(c.Salt)
 	c.Password = auth.Hash([]byte(pass), c.Salt)
 }
 
-func configServer() {
-	sharedConf, err := loadConfig()
+func Serve() {
+	sharedConf, err := Load()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,18 +64,21 @@ func configServer() {
 	for {
 		select {
 		case conf := <-configChan:
-			err = writeConfig(conf)
+			err = Save(conf)
 			errChan <- err
 			if err != nil {
 				log.Printf("Failed to write config: %v", err)
 			} else {
 				log.Printf("Config updated on disk.")
 				sharedConf = conf
-				fileList.Base = conf.Directory
+				if OnSave != nil {
+					OnSave(sharedConf)
+				}
 			}
 		case configChan <- sharedConf:
 		case <-reloadChan:
-			conf, err := loadConfig()
+			conf, err := Load()
+			errChan <- err
 			if err != nil {
 				log.Printf("Failed to reload config: %v", err)
 			} else {
@@ -101,17 +89,28 @@ func configServer() {
 	}
 }
 
-func loadConfig() (*Config, error) {
-	if err := os.MkdirAll(appDir, os.FileMode(0700)); err != nil {
-		return nil, err
-	}
+func Get() *Config {
+	return <-configChan
+}
+
+func Set(c *Config) error {
+	configChan <- c
+	return <-errChan
+}
+
+func Reload() error {
+	reloadChan <- struct{}{}
+	return <-errChan
+}
+
+func Load() (*Config, error) {
 	var conf Config
 
 	confFile, err := os.Open(confPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			conf = defaultConfig
-			err = writeConfig(&conf)
+			conf = Default
+			err = Save(&conf)
 			if err != nil {
 				return nil, err
 			}
@@ -132,7 +131,7 @@ func loadConfig() (*Config, error) {
 	return &conf, nil
 }
 
-func writeConfig(conf *Config) error {
+func Save(conf *Config) error {
 	b, err := json.MarshalIndent(conf, "", "    ")
 	if err != nil {
 		return fmt.Errorf("encoding config: %v", err)

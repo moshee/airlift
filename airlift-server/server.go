@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"image/jpeg"
 	"log"
 	"net"
 	"net/http"
@@ -17,25 +18,32 @@ import (
 	"syscall"
 	"time"
 
+	_ "net/http/pprof"
+
+	"ktkr.us/pkg/airlift/airlift-server/cache"
+	"ktkr.us/pkg/airlift/airlift-server/config"
+	"ktkr.us/pkg/airlift/airlift-server/misc"
+	"ktkr.us/pkg/airlift/airlift-server/thumb"
 	"ktkr.us/pkg/gas"
 	"ktkr.us/pkg/gas/auth"
 	"ktkr.us/pkg/gas/out"
 )
 
 var (
-	appDir        string // the place where all the stuff is stored
-	confPath      string // path of config file
-	fileList      *FileList
-	thumbCache    *FileList
-	defaultConfig = Config{
-		Host: "",
-		Port: 60606,
-	}
-	configChan = make(chan *Config)
-	reloadChan = make(chan struct{})
-	errChan    = make(chan error)
-	flagPort   = flag.Int("p", 0, "Override port in config")
+	appDir     string // the place where all the stuff is stored
+	fileCache  *cache.Cache
+	thumbCache *thumb.Cache
+	flagPort   = flag.Int("p", -1, "Override port in config")
 )
+
+const (
+	placeholderThumb = "/static/file.svg"
+)
+
+type Resp struct {
+	URL string `json:",omitempty"`
+	Err string `json:",omitempty"`
+}
 
 func init() {
 	u, err := user.Current()
@@ -43,16 +51,35 @@ func init() {
 		log.Fatal(err)
 	}
 	appDir = filepath.Join(u.HomeDir, ".airlift-server")
-	defaultConfig.Directory = filepath.Join(appDir, "uploads")
-	confPath = filepath.Join(appDir, "config")
+	if err := os.MkdirAll(appDir, os.FileMode(0700)); err != nil {
+		log.Fatal(err)
+	}
+	config.Default = config.Config{
+		Host:      "",
+		Port:      60606,
+		Directory: filepath.Join(appDir, "uploads"),
+	}
+	confPath := filepath.Join(appDir, "config")
+	if err := config.Init(confPath); err != nil {
+		log.Fatal(err)
+	}
+	config.OnSave = func(c *config.Config) {
+		fileCache.SetDir(c.Directory)
+	}
+
 	flag.Parse()
 
 	gas.Hook(syscall.SIGUSR2, func() {
-		reloadChan <- struct{}{}
+		if err := config.Reload(); err != nil {
+			log.Print(err)
+		}
 	})
 }
 
 func main() {
+	go func() {
+		log.Fatal(http.ListenAndServe(":6060", nil))
+	}()
 	sessDir := filepath.Join(appDir, "sessions")
 	os.RemoveAll(sessDir)
 	store := &auth.FileStore{Root: sessDir}
@@ -61,17 +88,23 @@ func main() {
 
 	auth.UseSessionStore(store)
 
-	go configServer()
+	go config.Serve()
 
-	conf := <-configChan
-
+	conf := config.Get()
 	var err error
-	fileList, thumbCache, err = conf.loadFiles()
+	fileCache, err = cache.New(conf.Directory)
 	if err != nil {
-		log.Fatalln("loading files:", err)
+		log.Fatalln("file list:", err)
+	}
+	thumbDir := filepath.Join(appDir, "thumb-cache")
+	thumbEnc := thumb.JPEGEncoder{&jpeg.Options{Quality: 88}}
+	thumbCache, err = thumb.NewCache(thumbDir, thumbEnc, fileCache)
+	if err != nil {
+		log.Fatalln("thumb cache:", err)
 	}
 
-	go fileList.watchAges()
+	go fileCache.WatchAges()
+	go thumbCache.Serve()
 
 	r := gas.New()
 
@@ -108,7 +141,7 @@ func main() {
 }
 
 func checkPassword(g *gas.Gas) (int, gas.Outputter) {
-	conf := <-configChan
+	conf := config.Get()
 
 	if conf.Password != nil {
 		pass := g.Request.Header.Get("X-Airlift-Password")
@@ -139,7 +172,7 @@ func redirectTLS(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func checkLogin(g *gas.Gas) (int, gas.Outputter) {
-	conf := <-configChan
+	conf := config.Get()
 
 	// if there's a password set, only allow user into config if they're logged
 	// in, otherwise it's probably the first run and they need to enter one
@@ -153,15 +186,15 @@ func checkLogin(g *gas.Gas) (int, gas.Outputter) {
 
 func getConfig(g *gas.Gas) (int, gas.Outputter) {
 	data := &struct {
-		Conf        *Config
-		NumUploads  SpaceConstrainedInt
-		UploadsSize Bytes
-		ThumbsSize  Bytes
+		Conf        *config.Config
+		NumUploads  misc.SpaceConstrainedInt
+		UploadsSize misc.Bytes
+		ThumbsSize  misc.Bytes
 	}{
-		<-configChan,
-		SpaceConstrainedInt(len(fileList.Files)),
-		Bytes(fileList.Size),
-		Bytes(thumbCache.Size),
+		config.Get(),
+		misc.SpaceConstrainedInt(fileCache.Len()),
+		misc.Bytes(fileCache.Size()),
+		misc.Bytes(thumbCache.Size()),
 	}
 
 	return 200, out.HTML("config", data, "common")
@@ -181,7 +214,7 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	if err := g.UnmarshalForm(&form); err != nil {
 		return 400, out.JSON(&Resp{Err: err.Error()})
 	}
-	conf := <-configChan
+	conf := config.Get()
 
 	if conf.Password != nil {
 		if form.Password == "" {
@@ -191,13 +224,13 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 			return 403, out.JSON(&Resp{Err: "incorrect password"})
 		}
 		if form.NewPass != "" {
-			conf.setPass(form.NewPass)
+			conf.SetPass(form.NewPass)
 		}
 	} else {
 		if form.NewPass == "" {
 			return 400, out.JSON(&Resp{Err: "cannot set empty password"})
 		} else {
-			conf.setPass(form.NewPass)
+			conf.SetPass(form.NewPass)
 		}
 	}
 
@@ -207,8 +240,7 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	conf.MaxAge = form.MaxAge
 	conf.MaxSize = form.MaxSize
 
-	configChan <- conf
-	if err := <-errChan; err != nil {
+	if err := config.Set(conf); err != nil {
 		log.Println(g.Request.Method, "postConfig:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
@@ -222,18 +254,16 @@ func getLogin(g *gas.Gas) (int, gas.Outputter) {
 		return reroute(g)
 	}
 
-	conf, err := loadConfig()
-	if err == nil {
-		if conf.Password == nil {
-			return reroute(g)
-		}
+	conf := config.Get()
+	if conf.Password == nil {
+		return reroute(g)
 	}
 
 	return 200, out.HTML("login", false, "common")
 }
 
 func postLogin(g *gas.Gas) (int, gas.Outputter) {
-	conf := <-configChan
+	conf := config.Get()
 
 	if err := auth.SignIn(g, conf, g.FormValue("pass")); err != nil {
 		return 200, out.HTML("login", true, "common")
@@ -241,6 +271,7 @@ func postLogin(g *gas.Gas) (int, gas.Outputter) {
 	return reroute(g)
 }
 
+// return to the URL that sent the reroute
 func reroute(g *gas.Gas) (int, gas.Outputter) {
 	out.CheckReroute(g)
 	var path string
@@ -261,14 +292,13 @@ func getLogout(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func getFile(g *gas.Gas) (int, gas.Outputter) {
-	conf := <-configChan
-	file := fileList.get(g.Arg("id"))
+	file := fileCache.Get(g.Arg("id"))
 	if file == "" {
 		return 404, out.Error(g, errors.New("ID not found"))
 	}
 
 	if g.Arg("filename") == "" {
-		filename := strings.SplitN(file, ".", 2)[1]
+		filename := strings.SplitN(filepath.Base(file), ".", 2)[1]
 		encoded := strings.Replace(url.QueryEscape(filename), "+", "%20", -1)
 		disposition := fmt.Sprintf("filename*=UTF-8''%s; filename=%s", encoded, encoded)
 		g.Header().Set("Content-Disposition", disposition)
@@ -276,16 +306,16 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 
 	threeMonthsFromNow := time.Now().Add(time.Hour * 24 * 30 * 3)
 	g.Header().Set("Expires", threeMonthsFromNow.Format(http.TimeFormat))
-	g.Header().Set("Cache-Control", "public") // enable browser caching for resources behind TLS
+	// enable browser caching for resources behind TLS
+	g.Header().Set("Cache-Control", "public")
 
-	path := filepath.Join(conf.Directory, file)
-	http.ServeFile(g, g.Request, path)
+	http.ServeFile(g, g.Request, file)
 
 	return -1, nil
 }
 
 func postFile(g *gas.Gas) (int, gas.Outputter) {
-	conf := <-configChan
+	conf := config.Get()
 
 	filename, err := url.QueryUnescape(g.Request.Header.Get("X-Airlift-Filename"))
 	if filename == "" {
@@ -296,7 +326,7 @@ func postFile(g *gas.Gas) (int, gas.Outputter) {
 	}
 	defer g.Body.Close()
 
-	hash, err := fileList.put(conf, g.Body, filename)
+	hash, err := fileCache.Put(g.Body, filename)
 	if err != nil {
 		log.Println(g.Request.Method, "postFile:", err)
 		panic("something weird is happening")
@@ -315,21 +345,19 @@ func deleteFile(g *gas.Gas) (int, gas.Outputter) {
 		return 400, out.JSON(&Resp{Err: "file ID not specified"})
 	}
 
-	fileList.Lock()
-	defer fileList.Unlock()
-	if err := fileList.remove(id); err != nil {
+	if err := fileCache.Remove(id); err != nil {
 		log.Println(g.Request.Method, "deleteFile:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
-	thumbCache.remove(id)
+	thumbCache.Remove(id)
 
 	return 204, nil
 }
 
 func oops(g *gas.Gas) (int, gas.Outputter) {
-	conf := <-configChan
+	conf := config.Get()
 
-	pruned, err := fileList.pruneNewest()
+	pruned, err := fileCache.RemoveNewest()
 	if err != nil {
 		log.Println(g.Request.Method, "oops:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
@@ -347,7 +375,7 @@ type File struct {
 	Name     string
 	Uploaded time.Time
 	HasThumb bool
-	Size     Bytes
+	Size     misc.Bytes
 }
 
 func (f *File) Ext() string {
@@ -395,7 +423,7 @@ func (f *File) Ago() string {
 }
 
 func getSortedList(offset, limit int) []*File {
-	ids := fileList.sortedIds()
+	ids := fileCache.SortedIDs()
 	if offset > len(ids) {
 		offset = 0
 	}
@@ -403,21 +431,21 @@ func getSortedList(offset, limit int) []*File {
 		limit = len(ids)
 	}
 
-	fileList.Lock()
+	fileCache.RLock()
 
 	list := make([]*File, limit)
 	ids = ids[len(ids)-limit-offset : len(ids)-offset]
 	for i, id := range ids {
-		fi := fileList.Files[id]
+		fi := fileCache.Stat(id)
 		list[len(list)-i-1] = &File{
 			ID:       id,
 			Name:     strings.SplitN(fi.Name(), ".", 2)[1],
 			Uploaded: fi.ModTime(),
-			Size:     Bytes(fi.Size()),
+			Size:     misc.Bytes(fi.Size()),
 		}
 	}
 
-	fileList.Unlock()
+	fileCache.RUnlock()
 
 	return list
 }
@@ -451,7 +479,7 @@ func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 		return 303, out.Redirect("/history/0")
 	}
 
-	l := len(fileList.Files)
+	l := fileCache.Len()
 
 	offset := page * itemsPerPage
 	if offset > l {
@@ -469,7 +497,7 @@ func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 	}
 
 	for i := range p.List {
-		if thumbnailFunc(p.List[i].Name) != nil {
+		if thumb.DecodeFunc(p.List[i].Name) != nil {
 			p.List[i].HasThumb = true
 		}
 	}
@@ -486,26 +514,26 @@ func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func getThumb(g *gas.Gas) (int, gas.Outputter) {
-	t := thumbPath(g.Arg("id"))
+	t := thumbCache.Get(g.Arg("id"))
 	if t == "" {
 		return 302, out.Redirect(placeholderThumb)
 	}
-	http.ServeFile(g, g.Request, filepath.Join(appDir, "thumb-cache", t))
+	http.ServeFile(g, g.Request, t)
 	return g.Stop()
 }
 
 func purgeThumbs(g *gas.Gas) (int, gas.Outputter) {
-	if err := thumbCache.purge(); err != nil {
+	if err := thumbCache.Purge(); err != nil {
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 	return 204, out.JSON(&Resp{})
 }
 
 func purgeAll(g *gas.Gas) (int, gas.Outputter) {
-	if err := fileList.purge(); err != nil {
+	if err := fileCache.RemoveAll(); err != nil {
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
-	if err := thumbCache.purge(); err != nil {
+	if err := thumbCache.Purge(); err != nil {
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 	return 204, out.JSON(&Resp{})

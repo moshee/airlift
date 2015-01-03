@@ -1,4 +1,4 @@
-package main
+package misc
 
 import (
 	"fmt"
@@ -47,14 +47,9 @@ func round(n float64, prec int) float64 {
 	return x / (float64(prec) * 10)
 }
 
-type Resp struct {
-	URL string `json:",omitempty"`
-	Err string `json:",omitempty"`
-}
-
 // makeHash squashes a long hash into a shorter one represented as four base62
 // characters.
-func makeHash(hash []byte) string {
+func MakeHash(hash []byte) string {
 	const (
 		hashLen = 4
 		chars   = "abcdefghijklmnopqrstuvwxyzZYXWVUTSRQPONMLKJIHGFEDCBA1234567890"
