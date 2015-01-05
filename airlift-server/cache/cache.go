@@ -86,7 +86,7 @@ func (c *Cache) Stat(id string) os.FileInfo {
 // Put copies a file to disk with the given filename and returns its hash.
 func (c *Cache) Put(content io.Reader, filename string) (string, error) {
 	os.MkdirAll(c.dir, 0700)
-	dest := c.filePath(filename)
+	dest := filepath.Join(c.dir, filename)
 	destFile, err := os.OpenFile(dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
 		os.Remove(dest)
@@ -97,14 +97,19 @@ func (c *Cache) Put(content io.Reader, filename string) (string, error) {
 
 	sha := sha3.New256()
 	w := io.MultiWriter(destFile, sha)
-	io.Copy(w, content)
+	n, err := io.Copy(w, content)
+	if err != nil {
+		os.Remove(dest)
+		return "", err
+	}
 	hash := misc.MakeHash(sha.Sum(nil))
 
-	if _, exist := c.files[hash]; exist {
+	if f, exist := c.files[hash]; exist {
+		log.Printf("overwriting existing file: %s (%d -> %d bytes)", f.Name(), f.Size(), n)
 		os.Remove(c.filePath(hash))
 	}
 
-	destPath := c.filePath(hash + "." + filename)
+	destPath := filepath.Join(c.dir, hash+"."+filename)
 	if err := os.Rename(dest, destPath); err != nil {
 		os.Remove(dest)
 		return "", err
@@ -199,7 +204,7 @@ func (c *Cache) CutToSize(n int64) error {
 	return nil
 }
 
-// RemoveOldest removes the oldest file in the cache.
+// removeOldest removes the oldest file in the cache.
 func (c *Cache) removeOldest() error {
 	if len(c.files) == 0 {
 		return nil
@@ -209,7 +214,7 @@ func (c *Cache) removeOldest() error {
 		oldestID string
 	)
 	for id, fi := range c.files {
-		if oldest != nil && fi.ModTime().Before(oldest.ModTime()) {
+		if oldest == nil || fi.ModTime().Before(oldest.ModTime()) {
 			oldest = fi
 			oldestID = id
 		}

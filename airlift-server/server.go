@@ -120,6 +120,14 @@ func main() {
 		gas.Env.Port = *flagPort
 	}
 
+	for _, code := range []int{400, 404, 500} {
+		func(code int) {
+			r.Get("/"+strconv.Itoa(code), func(g *gas.Gas) (int, gas.Outputter) {
+				return code, out.Error(g, errors.New("Blow out the cartridge and try again."))
+			})
+		}(code)
+	}
+
 	r.StaticHandler().
 		Get("/login", getLogin).
 		Get("/logout", getLogout).
@@ -331,7 +339,6 @@ func postFile(g *gas.Gas) (int, gas.Outputter) {
 	hash, err := fileCache.Put(g.Body, filename)
 	if err != nil {
 		log.Println(g.Request.Method, "postFile:", err)
-		panic("something weird is happening")
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 

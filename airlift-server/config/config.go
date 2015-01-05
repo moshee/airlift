@@ -56,26 +56,24 @@ func (c *Config) SetPass(pass string) {
 }
 
 func Serve() {
-	sharedConf, err := Load()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	for {
+		if sharedConfig == nil {
+			sharedConfig = &Default
+		}
 		select {
 		case conf := <-configChan:
-			err = Save(conf)
+			err := Save(conf)
 			errChan <- err
 			if err != nil {
 				log.Printf("Failed to write config: %v", err)
 			} else {
 				log.Printf("Config updated on disk.")
-				sharedConf = conf
+				sharedConfig = conf
 				if OnSave != nil {
-					OnSave(sharedConf)
+					OnSave(sharedConfig)
 				}
 			}
-		case configChan <- sharedConf:
+		case configChan <- sharedConfig:
 		case <-reloadChan:
 			conf, err := Load()
 			errChan <- err
@@ -83,7 +81,7 @@ func Serve() {
 				log.Printf("Failed to reload config: %v", err)
 			} else {
 				log.Print("Reloaded config.")
-				sharedConf = conf
+				sharedConfig = conf
 			}
 		}
 	}
