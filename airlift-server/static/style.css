@@ -13,6 +13,15 @@ body {
 	padding: 64px;
 	font-family: clear sans,sans-serif;
 }
+.error {
+	text-align: center;
+	color: #aaa;
+	margin: 64px 0;
+	padding: 0 32px;
+}
+.error h1 {
+	color: #444;
+}
 .floating-section, #config-nav {
 	margin: 0 auto 16px;
 	width: 512px;

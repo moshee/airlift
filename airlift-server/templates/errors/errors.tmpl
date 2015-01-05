@@ -1,10 +1,41 @@
-{{ define "error" }}<!doctype html>
-<body>
-  <p>{{ .Err }}</p>
-  <pre>{{ .Stack }}</pre>
-</body>
+{{ define "400" }}<!doctype html>
+<html>
+  <head>
+    <title>400</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <div class="error">
+      <h1>You're doing it wrong.</h1>
+      {{ if .Err }}<p>{{ .Err }}</p>{{ end }}
+    </div>
+  </body>
+</html>
 {{ end }}
-
-{{ define "400" }}{{ template "error" . }}{{ end }}
-{{ define "404" }}404 not found{{ end }}
-{{ define "500" }}{{ template "error" . }}{{ end }}
+{{ define "404" }}<!doctype html>
+<html>
+  <head>
+    <title>404</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <div class="error">
+      <h1>This isn't the page you're looking for.</h1>
+    </div>
+  </body>
+</html>
+{{ end }}
+{{ define "500" }}<!doctype html>
+<html>
+  <head>
+    <title>500</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <div class="error">
+      <h1>Something went wrong.</h1>
+      {{ if .Err }}<p>{{ .Err }}</p>{{ end }}
+    </div>
+  </body>
+</html>
+{{ end }}
