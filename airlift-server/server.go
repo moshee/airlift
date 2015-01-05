@@ -502,7 +502,7 @@ func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 	p := &historyPage{
 		List:        getSortedList(offset, limit),
 		CurrentPage: page,
-		TotalPages:  l/itemsPerPage - 1,
+		TotalPages:  l / itemsPerPage,
 	}
 
 	for i := range p.List {
