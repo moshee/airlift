@@ -123,11 +123,12 @@ func (c *Cache) Put(content io.Reader, filename string) (string, error) {
 
 	conf := config.Get()
 	if conf.MaxSize > 0 {
-		c.CutToSize(conf.MaxSize)
+		c.CutToSize(conf.MaxSize * 1024)
 	}
 
 	c.Lock()
 	c.files[hash] = fi
+	c.size += fi.Size()
 	c.Unlock()
 
 	return hash, nil
