@@ -22,8 +22,8 @@ import (
 
 	"ktkr.us/pkg/airlift/airlift-server/cache"
 	"ktkr.us/pkg/airlift/airlift-server/config"
-	"ktkr.us/pkg/airlift/airlift-server/misc"
 	"ktkr.us/pkg/airlift/airlift-server/thumb"
+	"ktkr.us/pkg/fmtutil"
 	"ktkr.us/pkg/gas"
 	"ktkr.us/pkg/gas/auth"
 	"ktkr.us/pkg/gas/out"
@@ -194,17 +194,23 @@ func checkLogin(g *gas.Gas) (int, gas.Outputter) {
 	return g.Continue()
 }
 
+type Bytes uint64
+
+func (b Bytes) String() string {
+	return fmtutil.SI(b).String() + "B"
+}
+
 func getConfig(g *gas.Gas) (int, gas.Outputter) {
 	data := &struct {
 		Conf        *config.Config
-		NumUploads  misc.SpaceConstrainedInt
-		UploadsSize misc.Bytes
-		ThumbsSize  misc.Bytes
+		NumUploads  int
+		UploadsSize Bytes
+		ThumbsSize  Bytes
 	}{
 		config.Get(),
-		misc.SpaceConstrainedInt(fileCache.Len()),
-		misc.Bytes(fileCache.Size()),
-		misc.Bytes(thumbCache.Size()),
+		fileCache.Len(),
+		Bytes(fileCache.Size()),
+		Bytes(thumbCache.Size()),
 	}
 
 	return 200, out.HTML("config", data, "common")
@@ -384,7 +390,7 @@ type File struct {
 	Name     string
 	Uploaded time.Time
 	HasThumb bool
-	Size     misc.Bytes
+	Size     Bytes
 }
 
 func (f *File) Ext() string {
@@ -450,7 +456,7 @@ func getSortedList(offset, limit int) []*File {
 			ID:       id,
 			Name:     strings.SplitN(fi.Name(), ".", 2)[1],
 			Uploaded: fi.ModTime(),
-			Size:     misc.Bytes(fi.Size()),
+			Size:     Bytes(fi.Size()),
 		}
 	}
 
