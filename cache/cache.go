@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/crypto/sha3"
+	"ktkr.us/pkg/airlift/config"
+	"ktkr.us/pkg/airlift/misc"
 
-	"ktkr.us/pkg/airlift/airlift-server/config"
-	"ktkr.us/pkg/airlift/airlift-server/misc"
+	"golang.org/x/crypto/sha3"
 )
 
 // Cache is an extremely naïve, map-based, fully in-memory key-value store

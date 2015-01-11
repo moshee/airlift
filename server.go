@@ -20,9 +20,9 @@ import (
 
 	//_ "net/http/pprof"
 
-	"ktkr.us/pkg/airlift/airlift-server/cache"
-	"ktkr.us/pkg/airlift/airlift-server/config"
-	"ktkr.us/pkg/airlift/airlift-server/thumb"
+	"ktkr.us/pkg/airlift/cache"
+	"ktkr.us/pkg/airlift/config"
+	"ktkr.us/pkg/airlift/thumb"
 	"ktkr.us/pkg/fmtutil"
 	"ktkr.us/pkg/gas"
 	"ktkr.us/pkg/gas/auth"
