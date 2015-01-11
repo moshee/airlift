@@ -22,18 +22,20 @@ import (
 // Persistence is achieved through the file system. It is concurrent-access
 // safe through locking.
 type Cache struct {
+	OnRemove func(id string)
+	*sync.RWMutex
 	size  int64                  // the total size of the files
 	dir   string                 // path of directory where files are stored
 	files map[string]os.FileInfo // map[id]filename
-	*sync.RWMutex
 }
 
 func New(dirPath string) (*Cache, error) {
 	c := &Cache{
+		nil,
+		new(sync.RWMutex),
 		0,
 		dirPath,
 		make(map[string]os.FileInfo),
-		new(sync.RWMutex),
 	}
 
 	os.MkdirAll(dirPath, 0755)
@@ -141,6 +143,9 @@ func (c *Cache) removeFile(id string) error {
 	}
 	c.size -= size
 	delete(c.files, id)
+	if c.OnRemove != nil {
+		c.OnRemove(id)
+	}
 	return nil
 }
 
@@ -151,20 +156,35 @@ func (c *Cache) Remove(id string) error {
 	return c.removeFile(id)
 }
 
-// RemoveOlderThan removes all files in the cache that were modified before t.
-// If an error is encountered while deleting a file, it will not advance any
-// further.
-func (c *Cache) RemoveOlderThan(t time.Time) error {
+// RemoveOlderThan removes all files in the cache that were modified before t,
+// returning the IDs of the deleted files.  If an error is encountered while
+// deleting a file, it will not advance any further.
+func (c *Cache) RemoveOlderThan(t time.Time) ([]string, error) {
 	c.Lock()
 	defer c.Unlock()
+	ids := []string{}
 	for id, fi := range c.files {
 		if fi.ModTime().Before(t) {
 			if err := c.removeFile(id); err != nil {
-				return err
+				return nil, err
 			}
 		}
+		ids = append(ids, id)
 	}
-	return nil
+	return ids, nil
+}
+
+func (c *Cache) MaybeRemoveOlderThan(t time.Time) int {
+	c.RLock()
+	defer c.RUnlock()
+	ids := c.SortedIDs()
+	for i, id := range ids {
+		fi := c.files[id]
+		if fi != nil && !fi.ModTime().Before(t) {
+			return i
+		}
+	}
+	return 0
 }
 
 // RemoveNewest removes the most recently modified item in the cache. It
@@ -193,22 +213,44 @@ func (c *Cache) RemoveNewest() (string, error) {
 }
 
 // CutToSize removes the oldest file in the cache until the total size is at
-// most n bytes.
-func (c *Cache) CutToSize(n int64) error {
+// most n bytes, returning the IDs of the deleted files. Nothing will happen if
+// n == 0. To remove all files, use RemoveAll.
+func (c *Cache) CutToSize(n int64) ([]string, error) {
+	if n == 0 {
+		return nil, nil
+	}
 	c.Lock()
 	defer c.Unlock()
+	ids := []string{}
 	for c.size > n && len(c.files) > 0 {
-		if err := c.removeOldest(); err != nil {
-			return err
+		id, err := c.removeOldest()
+		if err != nil {
+			return nil, err
 		}
+		ids = append(ids, id)
 	}
-	return nil
+	return ids, nil
+}
+
+// MaybeCutToSize returns how many files would be pruned if CutToSize would
+// have been called.
+func (c *Cache) MaybeCutToSize(n int64) (m int) {
+	c.RLock()
+	defer c.RUnlock()
+	target := c.size - n
+	s := int64(0)
+	ids := c.SortedIDs()
+	for i := 0; i < len(ids) && s <= target; i++ {
+		m++
+		s += c.files[ids[i]].Size()
+	}
+	return
 }
 
 // removeOldest removes the oldest file in the cache.
-func (c *Cache) removeOldest() error {
+func (c *Cache) removeOldest() (string, error) {
 	if len(c.files) == 0 {
-		return nil
+		return "", nil
 	}
 	var (
 		oldest   os.FileInfo
@@ -220,7 +262,7 @@ func (c *Cache) removeOldest() error {
 			oldestID = id
 		}
 	}
-	return c.removeFile(oldestID)
+	return oldestID, c.removeFile(oldestID)
 }
 
 // RemoveAll removes every file in the cache.
@@ -241,7 +283,7 @@ func (c *Cache) WatchAges() {
 		before := time.Now()
 		if conf.MaxAge > 0 {
 			cutoff := before.Add(-time.Duration(conf.MaxAge) * 24 * time.Hour)
-			if err := c.RemoveOlderThan(cutoff); err != nil {
+			if _, err := c.RemoveOlderThan(cutoff); err != nil {
 				log.Print(err)
 			}
 		}

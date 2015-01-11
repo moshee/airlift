@@ -105,6 +105,12 @@ func main() {
 		log.Fatalln("thumb cache:", err)
 	}
 
+	fileCache.OnRemove = func(id string) {
+		if err := thumbCache.Remove(id); err != nil {
+			log.Print(err)
+		}
+	}
+
 	go fileCache.WatchAges()
 	go thumbCache.Serve()
 
@@ -133,7 +139,10 @@ func main() {
 		Get("/logout", getLogout).
 		Post("/login", postLogin).
 		Get("/config", checkLogin, getConfig).
-		Post("/config", postConfig).
+		Post("/config", checkLogin, postConfig).
+		Post("/config/size", checkLogin, getSizeLimitPrune).
+		Post("/config/age", checkLogin, getAgeLimitPrune).
+		Get("/config/overview", checkLogin, getConfigOverview).
 		Post("/upload/file", checkPassword, postFile).
 		Post("/oops", checkPassword, oops).
 		Get("/l", checkPassword, getList).
@@ -147,9 +156,11 @@ func main() {
 		Get("/{id}/{filename}", getFile).
 		Get("/{id}.{ext}", getFile).
 		Get("/{id}", getFile).
+		Get("/", checkLogin, getIndex).
 		Ignition()
 }
 
+// header password
 func checkPassword(g *gas.Gas) (int, gas.Outputter) {
 	conf := config.Get()
 
@@ -181,6 +192,7 @@ func redirectTLS(g *gas.Gas) (int, gas.Outputter) {
 	return g.Continue()
 }
 
+// login cookie
 func checkLogin(g *gas.Gas) (int, gas.Outputter) {
 	conf := config.Get()
 
@@ -214,6 +226,20 @@ func getConfig(g *gas.Gas) (int, gas.Outputter) {
 	}
 
 	return 200, out.HTML("config", data, "common")
+}
+
+func getConfigOverview(g *gas.Gas) (int, gas.Outputter) {
+	data := &struct {
+		NumUploads  int
+		UploadsSize Bytes
+		ThumbsSize  Bytes
+	}{
+		fileCache.Len(),
+		Bytes(fileCache.Size()),
+		Bytes(thumbCache.Size()),
+	}
+
+	return 200, out.HTML("overview", data)
 }
 
 func postConfig(g *gas.Gas) (int, gas.Outputter) {
@@ -259,6 +285,20 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	if err := config.Set(conf); err != nil {
 		log.Println(g.Request.Method, "postConfig:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
+	}
+
+	if conf.MaxSize > 0 {
+		_, err := fileCache.CutToSize(conf.MaxSize * 1024 * 1024)
+		if err != nil {
+			log.Print(err)
+		}
+	}
+	if conf.MaxAge > 0 {
+		cutoff := time.Now().Add(-time.Duration(conf.MaxAge) * 24 * time.Hour)
+		_, err := fileCache.RemoveOlderThan(cutoff)
+		if err != nil {
+			log.Print(err)
+		}
 	}
 
 	return 204, nil
@@ -364,7 +404,6 @@ func deleteFile(g *gas.Gas) (int, gas.Outputter) {
 		log.Println(g.Request.Method, "deleteFile:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
-	thumbCache.Remove(id)
 
 	return 204, nil
 }
@@ -552,4 +591,31 @@ func purgeAll(g *gas.Gas) (int, gas.Outputter) {
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 	return 204, out.JSON(&Resp{})
+}
+
+func getSizeLimitPrune(g *gas.Gas) (int, gas.Outputter) {
+	var form struct{ N int }
+	if err := g.UnmarshalForm(&form); err != nil {
+		return 400, out.JSON(&Resp{Err: err.Error()})
+	}
+	m := fileCache.MaybeCutToSize(int64(form.N) * 1024 * 1024)
+	return 200, out.JSON(&struct{ N int }{m})
+}
+
+func getAgeLimitPrune(g *gas.Gas) (int, gas.Outputter) {
+	var form struct{ N int }
+	if err := g.UnmarshalForm(&form); err != nil {
+		return 400, out.JSON(&Resp{Err: err.Error()})
+	}
+	log.Print(time.Now())
+	log.Printf("%d days ago\n", form.N)
+	t := time.Now().Add(-time.Duration(form.N) * 24 * time.Hour)
+	log.Print(t)
+	m := fileCache.MaybeRemoveOlderThan(t)
+	log.Print(m)
+	return 200, out.JSON(&struct{ N int }{m})
+}
+
+func getIndex(g *gas.Gas) (int, gas.Outputter) {
+	return 200, out.HTML("index", nil, "common")
 }
