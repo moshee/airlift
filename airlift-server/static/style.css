@@ -22,7 +22,7 @@ body {
 .error h1 {
 	color: #444;
 }
-.floating-section, #config-nav {
+.floating-section, #nav {
 	margin: 0 auto 16px;
 	width: 512px;
 }
@@ -34,7 +34,7 @@ body {
 	position: relative;
 	border: 3px solid #eee;
 }
-#config-nav {
+#nav {
 	text-align: right;
 }
 section h1 {
@@ -258,4 +258,51 @@ input:focus {
 }
 .delete-upload {
 	color: #888;
+}
+
+#upload-form.active {
+	border: 4px solid #c64;
+	margin: -4px;
+}
+#picker {
+	visibility: hidden;
+	position: absolute;
+	width: 0;
+	height: 0;
+}
+#drop-zone {
+	height: 128px;
+	position: relative;
+	border: 4px dashed #aaa;
+	color: #888;
+	cursor: pointer;
+}
+#drop-zone-text {
+	position: absolute;
+	height: 120px;
+	width: 100%;
+	line-height: 120px;
+	font-size: 20px;
+	text-align: center;
+	z-index: 9;
+}
+#drop-zone.active {
+	border: 4px solid #c64;
+	background: #fa8;
+	color: #fff;
+}
+.progress-bar {
+	position: absolute;
+	left: 0;
+	top: 0;
+	height: 100%;
+	width: 0%;
+	background: #c64;
+	z-index: 1;
+}
+#uploaded-url {
+	display: none;
+}
+#uploaded-url.active {
+	display: inline-block;
 }

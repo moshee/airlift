@@ -143,6 +143,7 @@ func main() {
 		Post("/config/size", checkLogin, getSizeLimitPrune).
 		Post("/config/age", checkLogin, getAgeLimitPrune).
 		Get("/config/overview", checkLogin, getConfigOverview).
+		Post("/upload/web", checkLogin, postFile).
 		Post("/upload/file", checkPassword, postFile).
 		Post("/oops", checkPassword, oops).
 		Get("/l", checkPassword, getList).
@@ -315,7 +316,7 @@ func getLogin(g *gas.Gas) (int, gas.Outputter) {
 		return reroute(g)
 	}
 
-	return 200, out.HTML("login", false, "common")
+	return 200, out.HTML("login", false)
 }
 
 func postLogin(g *gas.Gas) (int, gas.Outputter) {

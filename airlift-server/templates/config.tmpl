@@ -1,7 +1,4 @@
 {{ define "config" }}
-  <nav id="config-nav">
-    <a href="/logout">Log out</a>
-  </nav>
   <section id="section-overview" class="floating-section">
     {{ template "overview" . }}
   </section>
@@ -111,7 +108,6 @@
           if (e.target.status === 204) {
             showMessage($('#section-config'), 'Configuration updated.', 'good');
             $('#newpass').value = '';
-            timeout = window.setTimeout(hideMessage, 5000);
             reloadOverview();
           } else {
             var resp = JSON.parse(x.responseText);
@@ -136,13 +132,21 @@
     <p>Thumbnail cache is {{ .ThumbsSize }}. (<a href="javascript:purgeThumbs()">purge</a>)</p>
 {{ end }}
 
-{{ define "login" }}
-  <section id="section-login" class="floating-section">
-    <form method="post" action="/login" id="login">
-      {{ if . }}<p id="message-box" class="bad">Incorrect password.</p>{{ end }}
-      <label for="password">Password: </label><input name="pass" id="password" type="password" placeholder="password" autofocus required>
-      <hr>
-      <button type="submit" id="submit">Log in</button>
-    </form>
-  </section>
+{{ define "login" }}<!doctype html>
+<html>
+  <head>
+    <title>Log in</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <section id="section-login" class="floating-section">
+      <form method="post" action="/login" id="login">
+        {{ if . }}<p id="message-box" class="bad">Incorrect password.</p>{{ end }}
+        <label for="password">Password: </label><input name="pass" id="password" type="password" placeholder="password" autofocus required>
+        <hr>
+        <button type="submit" id="submit">Log in</button>
+      </form>
+    </section>
+  </body>
+</html>
 {{ end }}

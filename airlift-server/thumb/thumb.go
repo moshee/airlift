@@ -218,7 +218,11 @@ func (c *Cache) doPurge() error {
 
 func (c *Cache) Remove(id string) error {
 	c.remove <- id
-	return (<-c.resp).(error)
+	err := <-c.resp
+	if v, ok := err.(error); ok {
+		return v
+	}
+	return nil
 }
 
 func (c *Cache) doRemove(id string) error {
