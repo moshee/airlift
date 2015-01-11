@@ -4,7 +4,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 
-	"code.google.com/p/go.crypto/twofish"
+	"golang.org/x/crypto/twofish"
 )
 
 const (
