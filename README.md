@@ -1,12 +1,12 @@
 # Airlift
 
 Airlift is a self-hosted file upload and sharing service. It includes a server
-(`airlift-server`) and a [CLI client][1] (`lift`). A preliminary OS X GUI
-client may be found at [moshee/AirliftOSX][2]. GUI clients for iOS, Windows, and
-Linux coming soon™.
+(`airlift-server`) and a [CLI client][cli] (`lift`). A preliminary OS X GUI
+client may be found at [moshee/AirliftOSX][osx]. GUI clients for iOS, Windows,
+and Linux coming soon™.
 
-[1]: https://github.com/moshee/lift
-[2]: https://github.com/moshee/AirliftOSX
+[cli]: https://github.com/moshee/lift
+[osx]: https://github.com/moshee/AirliftOSX
 
 The clients upload files to the server and return a nice link for you to
 share. Just bring your own server and domain.
