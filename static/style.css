@@ -22,9 +22,10 @@ body {
 .error h1 {
 	color: #444;
 }
-.floating-section, #nav {
-	margin: 0 auto 16px;
-	width: 512px;
+#nav {
+	text-align: center;
+	width: 100%;
+	margin-bottom: 16px;
 }
 .floating-section {
 	margin: 0 auto 16px;
@@ -33,9 +34,6 @@ body {
 	background: #fff;
 	position: relative;
 	border: 3px solid #eee;
-}
-#nav {
-	text-align: right;
 }
 section h1 {
 	text-transform: uppercase;
@@ -214,11 +212,12 @@ input:focus {
 	list-style-type: none;
 }
 
-#history ul li {
+.history-item {
 	display: inline-block;
 	padding: 16px;
+	transition: opacity;
+	transition-duration: 0.5s;
 }
-
 .upload-link {
 	display: block;
 	width: 100px;
@@ -239,10 +238,6 @@ input:focus {
 	color: #fff;
 	bottom: 36px;
 	font-weight: 700;
-}
-.history-item {
-	transition: opacity;
-	transition-duration: 0.5s;
 }
 .history-item-name {
 	width: 100px;
@@ -305,4 +300,34 @@ input:focus {
 }
 #uploaded-url.active {
 	display: inline-block;
+}
+
+@media screen and (max-width: 600px) {
+	body {
+		padding: 64px 0;
+	}
+	.floating-section {
+		width: 100%;
+		border-left: none;
+		border-right: none;
+		padding: 16px;
+	}
+	.box {
+		width: 100% !important;
+	}
+	#history {
+		padding: 8px;
+	}
+	#pagination {
+		text-align: center;
+	}
+}
+@media screen and (max-width: 320px) {
+	#history {
+		padding: 0 0 0 40px;
+	}
+	.history-item {
+		width: 136px;
+		padding: 0 40px 16px 0;
+	}
 }
