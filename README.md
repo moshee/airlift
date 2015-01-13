@@ -1,9 +1,9 @@
 # Airlift
 
 Airlift is a self-hosted file upload and sharing service. It includes a server
-(`airlift-server`) and a [CLI client][cli] (`lift`). A preliminary OS X GUI
-client may be found at [moshee/AirliftOSX][osx]. GUI clients for iOS, Windows,
-and Linux coming soon™.
+(`airlift`) and a [CLI client][cli] (`lift`). A preliminary OS X GUI client may
+be found at [moshee/AirliftOSX][osx]. GUI clients for iOS, Windows, and Linux
+coming soon™.
 
 [cli]: https://github.com/moshee/lift
 [osx]: https://github.com/moshee/AirliftOSX
@@ -19,12 +19,12 @@ instead of this if...
 - ...you're on a free/cheap shared host that doesn't allow long-running
   processes.
 
-# airlift-server
+# airlift
 
-`airlift-server` is the Airlift server. You drop the server on any
-dedicated, VPS, shared host, whatever, as long as it supports running a binary
-and gives you access to ports or frontend server reverse proxying. A client
-sends files to it and recieves nice URLs to share.
+`airlift` is the Airlift server. You drop the server on any dedicated, VPS,
+shared host, whatever, as long as it supports running a binary and gives you
+access to ports or frontend server reverse proxying. A client sends files to it
+and recieves nice URLs to share.
 
 The server is packaged as a statically compiled binary with a few text assets
 with no system dependencies apart from maybe libc for networking. Just download
@@ -36,16 +36,9 @@ You can choose to run it behind a frontend server or standalone.
 
 #### If you just want a binary
 
-       | linux      | darwin
--------|------------|------------
- 386   | [~2.5M][1] | —
- amd64 | [~2.5M][2] | [~2.4M][3]
+`airlift` [linux/amd64](http://static.displaynone.us/airlift/airlift-linux_amd64.tar.bz2)
 
-[1]: http://static.displaynone.us/airlift-server/airlift-server-linux_386.tar.bz2
-[2]: http://static.displaynone.us/airlift-server/airlift-server-linux_amd64.tar.bz2
-[3]: http://static.displaynone.us/airlift-server/airlift-server-darwin_amd64.tar.bz2
-
-I can add more platforms if anyone wants. I'll try to keep them current.
+(proper cross-compiling is not really worth it because this imports the `os/user` package)
 
 #### Or if you want to build it yourself
 
@@ -58,7 +51,7 @@ Before you build, if you have not already:
 Then,
 
 ```
-$ go get -u github.com/moshee/airlift/airlift-server
+$ go get -u github.com/moshee/airlift
 ```
 
 I haven't tried to build or run it on Windows, YMMV. Works on OS X and
@@ -70,24 +63,23 @@ This can be anywhere that isn't `$GOROOT`; you can set it to any arbitrary
 place like `~/go`. Assuming that's what it is, then
 
 ```
-~/go/src/github.com/moshee/airlift-server$ go build
-~/go/src/github.com/moshee/airlift-server$ ./airlift-server
+~/go/src/github.com/moshee/airlift$ go build
+~/go/src/github.com/moshee/airlift$ ./airlift
 ```
 
 to build and run.
 
 [GOPATH]: https://code.google.com/p/go-wiki/wiki/GOPATH
 
-The binary produced by `go build` will be in your working
-directory at the moment you built it. By default, `go get` will install the
-binary to `$GOPATH/bin` after building. It isn't very useful there, because...
+The binary produced by `go build` will be in your working directory at the
+moment you built it. By default, `go get` will install the binary to
+`$GOPATH/bin` after building. It isn't very useful there, because...
 
 ### Usage
 
 ...the server must be run with the `templates` and `static` subdirectories in
-its working directory. Whatever else you do is up to you. Just
-`$ ./airlift-server` to run it in your terminal. Use your favorite tools to
-background it.
+its working directory. Whatever else you do is up to you. Just `$ ./airlift` to
+run it in your terminal. Use your favorite tools to background it.
 
 When you start the server for the first time, it will generate a dotfolder in
 your home directory for local configuration. Visit
@@ -100,11 +92,11 @@ and path.
 
 If you are proxying the server behind a frontend at a certain subdirectory,
 make sure you rewrite the leading path out of the request URL so that the URLs
-sent to `airlift-server` are rooted. Unfortunately, since URLs are rewritten,
-the redirecting behavior of /login and /config won't work properly, so you'll
-have to do your configuration on the internal port (60606 or whatever). Could
-use a meta redirect instead of internal redirect to fix this, but that doesn't
-play well with how sessions and stuff are set up in here.
+sent to `airlift` are rooted. Unfortunately, since URLs are rewritten, the
+redirecting behavior of /login and /config won't work properly, so you'll have
+to do your configuration on the internal port (60606 or whatever). Could use a
+meta redirect instead of internal redirect to fix this, but that doesn't play
+well with how sessions and stuff are set up in here.
 
 Leaving the host field empty will cause the server to return whatever host the
 file was posted to.
