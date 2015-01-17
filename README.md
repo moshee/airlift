@@ -24,7 +24,9 @@ instead of this if...
 `airlift` is the Airlift server. You drop the server on any dedicated, VPS,
 shared host, whatever, as long as it supports running a binary and gives you
 access to ports or frontend server reverse proxying. A client sends files to it
-and recieves nice URLs to share.
+and recieves nice URLs to share. The server itself also provides a web-based
+client to upload files from, as well as manage existing uploads and customize
+some behaviors.
 
 The server is packaged as a statically compiled binary with a few text assets
 with no system dependencies apart from maybe libc for networking. Just download
