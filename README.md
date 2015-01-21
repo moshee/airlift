@@ -58,7 +58,7 @@ This can be anywhere that isn't `$GOROOT`; you can set it to any arbitrary
 place like `~/go`. Assuming that's what it is, then
 
 ```
-~/go/src/ktkr.us/pkg/airlift`
+~/go/src/ktkr.us/pkg/airlift$ go build
 ~/go/src/ktkr.us/pkg/airlift$ ./airlift
 ```
 
