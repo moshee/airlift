@@ -40,21 +40,14 @@ You can choose to run it behind a frontend server or standalone.
 
 `airlift` [linux/amd64](http://static.displaynone.us/airlift/airlift-linux_amd64.tar.bz2)
 
-(proper cross-compiling is not really worth it because this imports the `os/user` package)
+(proper cross-compiling is not really worth it because this imports the
+`os/user` package)
 
 #### Or if you want to build it yourself
 
-Before you build, if you have not already:
-
-1. [Install Go](http://golang.org/doc/install), git, and mercurial (if you
-   haven't already)
+1. [Install Go](http://golang.org/doc/install) and git
 2. `$ mkdir ~/go && export GOPATH=~/go` (you can use any place as your GOPATH)
-
-Then,
-
-```
-$ go get -u github.com/moshee/airlift
-```
+3. `$ go get -u ktkr.us/pkg/airlift`
 
 I haven't tried to build or run it on Windows, YMMV. Works on OS X and
 GNU+Linux.
@@ -65,13 +58,13 @@ This can be anywhere that isn't `$GOROOT`; you can set it to any arbitrary
 place like `~/go`. Assuming that's what it is, then
 
 ```
-~/go/src/github.com/moshee/airlift$ go build
-~/go/src/github.com/moshee/airlift$ ./airlift
+~/go/src/ktkr.us/pkg/airlift`
+~/go/src/ktkr.us/pkg/airlift$ ./airlift
 ```
 
 to build and run.
 
-[GOPATH]: https://code.google.com/p/go-wiki/wiki/GOPATH
+[GOPATH]: https://github.com/golang/go/wiki/GOPATH
 
 The binary produced by `go build` will be in your working directory at the
 moment you built it. By default, `go get` will install the binary to
