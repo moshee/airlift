@@ -1,15 +1,8 @@
 # Airlift
 
-Airlift is a self-hosted file upload and sharing service. It includes a server
-(`airlift`) and a [CLI client][cli] (`lift`). A preliminary OS X GUI client may
-be found at [moshee/AirliftOSX][osx]. GUI clients for iOS, Windows, and Linux
-coming soon™.
-
-[cli]: https://github.com/moshee/lift
-[osx]: https://github.com/moshee/AirliftOSX
-
-The clients upload files to the server and return a nice link for you to
-share. Just bring your own server and domain.
+Airlift is a self-hosted file upload and sharing service. The clients upload
+files to the server and return a nice link for you to share. Just bring your
+own server and domain.
 
 You should use [deuiore/load.link](https://github.com/deuiore/load.link)
 instead of this if...
@@ -18,6 +11,15 @@ instead of this if...
 - ...you don't like me;
 - ...you're on a free/cheap shared host that doesn't allow long-running
   processes.
+
+#### Clients
+
+- Web interface (included in server)
+- [Cross-plaform (CLI)][cli]
+- [OS X][osx]
+
+[cli]: https://github.com/moshee/lift
+[osx]: https://github.com/moshee/AirliftOSX
 
 # airlift
 
