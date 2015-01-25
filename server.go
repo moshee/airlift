@@ -357,7 +357,11 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	if g.Arg("filename") == "" {
 		filename := strings.SplitN(filepath.Base(file), ".", 2)[1]
 		encoded := strings.Replace(url.QueryEscape(filename), "+", "%20", -1)
-		disposition := fmt.Sprintf("filename*=UTF-8''%s; filename=%s", encoded, encoded)
+		// RFC2616 §2.2 - syntax of quoted strings
+		escaped := strings.Replace(filename, `\`, `\\`, -1)
+		escaped = strings.Replace(escaped, `"`, `\"`, -1)
+		// RFC5987 §3.2.1 - syntax of regular and extended header value encoding
+		disposition := fmt.Sprintf(`filename="%s"; filename*=UTF-8''%s`, escaped, encoded)
 		g.Header().Set("Content-Disposition", disposition)
 	}
 
