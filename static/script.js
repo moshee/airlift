@@ -79,7 +79,6 @@ function uploadFile(fileList) {
 		bar.style.width = '100%';
 	}, false);
 
-	console.trace('attach cancel');
 	dropZone.removeEventListener('click', clickPicker);
 
 	var cancel = function() {
@@ -126,7 +125,6 @@ function dropZoneLeave(e) {
 }
 
 function dropped(e) {
-	console.log(e);
 	e.stopPropagation();
 	e.preventDefault();
 	uploadFile(e.dataTransfer.files);
@@ -140,7 +138,6 @@ function finish() {
 }
 
 function enable() {
-	console.trace('attach click');
 	dropZone.addEventListener('click', clickPicker, false);
 	dropZoneText.addEventListener('dragenter', dropZoneEnter, false);
 	dropZoneText.addEventListener('dragover', dropZoneEnter, false);
