@@ -297,6 +297,7 @@ input:focus {
 }
 #uploaded-url {
 	display: none;
+	margin-top: 32px;
 }
 #uploaded-url.active {
 	display: inline-block;
