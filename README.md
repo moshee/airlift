@@ -49,7 +49,7 @@ You can choose to run it behind a frontend server or standalone.
 
 1. [Install Go](http://golang.org/doc/install) and git
 2. `$ mkdir ~/go && export GOPATH=~/go` (you can use any place as your GOPATH)
-3. `$ go get -u ktkr.us/pkg/airlift`
+3. `$ go get -d -u ktkr.us/pkg/airlift`
 
 I haven't tried to build or run it on Windows, YMMV. Works on OS X and
 GNU+Linux.
