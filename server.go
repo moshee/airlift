@@ -323,7 +323,7 @@ func postLogin(g *gas.Gas) (int, gas.Outputter) {
 	conf := config.Get()
 
 	if err := auth.SignIn(g, conf, g.FormValue("pass")); err != nil {
-		return 200, out.HTML("login", true, "common")
+		return 200, out.HTML("login", true)
 	}
 	return reroute(g)
 }

@@ -131,22 +131,3 @@
     <p><strong><a href="/history/0">{{ .NumUploads }} uploads</a></strong> totalling {{ .UploadsSize }}. (<a href="javascript:purgeAll()">purge</a>)</p>
     <p>Thumbnail cache is {{ .ThumbsSize }}. (<a href="javascript:purgeThumbs()">purge</a>)</p>
 {{ end }}
-
-{{ define "login" }}<!doctype html>
-<html>
-  <head>
-    <title>Log in</title>
-    <link rel="stylesheet" href="/static/style.css">
-  </head>
-  <body>
-    <section id="section-login" class="floating-section">
-      <form method="post" action="/login" id="login">
-        {{ if . }}<p id="message-box" class="bad">Incorrect password.</p>{{ end }}
-        <label for="password">Password: </label><input name="pass" id="password" type="password" placeholder="password" autofocus required>
-        <hr>
-        <button type="submit" id="submit">Log in</button>
-      </form>
-    </section>
-  </body>
-</html>
-{{ end }}
