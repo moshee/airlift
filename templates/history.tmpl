@@ -1,5 +1,6 @@
 {{ define "history" }}
 <section id="history">
+  {{ if len .List | lt 25 }}{{ template "pagination" . }}{{ end }}
   <ul>
     {{ range .List }}
     <li class="history-item" data-id="{{ .ID }}">
@@ -10,11 +11,7 @@
     </li>
     {{ end }}
   </ul>
-  <nav id="pagination">
-    {{ if ne .CurrentPage 0 }}<a href="/history/{{ .PrevPage }}">Back</a> — {{ end }}
-    <sup>{{ .CurrentPage }}</sup>&frasl;<sub>{{ .TotalPages }}</sub>
-    {{ if ne .NextPage 0 }} — <a href="/history/{{ .NextPage }}">Next</a>{{ end }}
-  </nav>
+  {{ template "pagination" . }}
 </section>
 <script>
   window.addEventListener('DOMContentLoaded', function() {
@@ -50,4 +47,12 @@
     }
   }, true);
 </script>
+{{ end }}
+
+{{ define "pagination" }}
+<nav class="pagination">
+  {{ if ne .CurrentPage 0 }}<a href="/history/{{ .PrevPage }}">Back</a> — {{ end }}
+  <sup>{{ .CurrentPage }}</sup>&frasl;<sub>{{ .TotalPages }}</sub>
+  {{ if ne .NextPage 0 }} — <a href="/history/{{ .NextPage }}">Next</a>{{ end }}
+</nav>
 {{ end }}

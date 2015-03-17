@@ -323,8 +323,9 @@ input:focus {
 	#history {
 		padding: 8px;
 	}
-	#pagination {
+	.pagination {
 		text-align: center;
+		margin: 0 32px 16px 0;
 	}
 	.box[data-tooltip]:hover::before, #help:hover ~ .box[data-tooltip]::before {
 		display: none !important;
