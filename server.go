@@ -207,23 +207,17 @@ func checkLogin(g *gas.Gas) (int, gas.Outputter) {
 	return g.Continue()
 }
 
-type Bytes uint64
-
-func (b Bytes) String() string {
-	return fmtutil.SI(b).String() + "B"
-}
-
 func getConfig(g *gas.Gas) (int, gas.Outputter) {
 	data := &struct {
 		Conf        *config.Config
 		NumUploads  int
-		UploadsSize Bytes
-		ThumbsSize  Bytes
+		UploadsSize fmtutil.Bytes
+		ThumbsSize  fmtutil.Bytes
 	}{
 		config.Get(),
 		fileCache.Len(),
-		Bytes(fileCache.Size()),
-		Bytes(thumbCache.Size()),
+		fmtutil.Bytes(fileCache.Size()),
+		fmtutil.Bytes(thumbCache.Size()),
 	}
 
 	return 200, out.HTML("config", data, "common")
@@ -232,12 +226,12 @@ func getConfig(g *gas.Gas) (int, gas.Outputter) {
 func getConfigOverview(g *gas.Gas) (int, gas.Outputter) {
 	data := &struct {
 		NumUploads  int
-		UploadsSize Bytes
-		ThumbsSize  Bytes
+		UploadsSize fmtutil.Bytes
+		ThumbsSize  fmtutil.Bytes
 	}{
 		fileCache.Len(),
-		Bytes(fileCache.Size()),
-		Bytes(thumbCache.Size()),
+		fmtutil.Bytes(fileCache.Size()),
+		fmtutil.Bytes(thumbCache.Size()),
 	}
 
 	return 200, out.HTML("overview", data)
@@ -434,7 +428,7 @@ type File struct {
 	Name     string
 	Uploaded time.Time
 	HasThumb bool
-	Size     Bytes
+	Size     fmtutil.Bytes
 }
 
 func (f *File) Ext() string {
@@ -445,40 +439,13 @@ func (f *File) Ext() string {
 	return ext
 }
 
-const (
-	sec   = time.Second
-	min   = sec * 60
-	hr    = min * 60
-	day   = hr * 24
-	week  = day * 7
-	month = day * 30
-	year  = day * 365
-)
-
-func p(n time.Duration, s string) string {
-	return fmt.Sprintf("%d%s", n, s)
-}
-
 func (f *File) Ago() string {
 	n := time.Now().Sub(f.Uploaded)
-	switch {
-	case n < sec:
+	if n < time.Second {
 		return "just now"
-	case n < min:
-		return p(n/sec, "s")
-	case n < hr:
-		return p(n/min, "m")
-	case n < day:
-		return p(n/hr, "h")
-	case n < 2*week:
-		return p(n/day, "d")
-	case n < month:
-		return p(n/week, "w")
-	case n < year:
-		return p(n/month, "mo")
-	default:
-		return p(n/year, "y")
 	}
+
+	return fmtutil.LongDuration(n)
 }
 
 func getSortedList(offset, limit int) []*File {
@@ -500,7 +467,7 @@ func getSortedList(offset, limit int) []*File {
 			ID:       id,
 			Name:     strings.SplitN(fi.Name(), ".", 2)[1],
 			Uploaded: fi.ModTime(),
-			Size:     Bytes(fi.Size()),
+			Size:     fmtutil.Bytes(fi.Size()),
 		}
 	}
 
