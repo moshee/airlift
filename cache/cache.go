@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"ktkr.us/pkg/airlift/config"
-	"ktkr.us/pkg/airlift/misc"
+	"ktkr.us/pkg/airlift/shorthash"
 
 	"golang.org/x/crypto/sha3"
 )
@@ -104,7 +104,7 @@ func (c *Cache) Put(content io.Reader, filename string) (string, error) {
 		os.Remove(dest)
 		return "", err
 	}
-	hash := misc.MakeHash(sha.Sum(nil))
+	hash := shorthash.Make(sha.Sum(nil), 4)
 
 	if f, exist := c.files[hash]; exist {
 		log.Printf("overwriting existing file: %s (%d -> %d bytes)", f.Name(), f.Size(), n)
