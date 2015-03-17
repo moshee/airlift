@@ -315,12 +315,19 @@ input:focus {
 	}
 	.box {
 		width: 100% !important;
+		margin-right: 0 !important;
+	}
+	#help {
+		display: none;
 	}
 	#history {
 		padding: 8px;
 	}
 	#pagination {
 		text-align: center;
+	}
+	.box[data-tooltip]:hover::before, #help:hover ~ .box[data-tooltip]::before {
+		display: none !important;
 	}
 }
 @media screen and (max-width: 320px) {
