@@ -2,6 +2,8 @@ function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return document.querySelectorAll(sel); }
 var timeout;
 
+function makesvg(elem) { return document.createElementNS("http://www.w3.org/2000/svg", elem); }
+
 function showMessage(root, msg, classname) {
 	if (timeout != null) window.clearTimeout(timeout);
 	var box = $('#message-box');
@@ -55,15 +57,10 @@ function purgeThumbs() {
 
 var dropZone, dropZoneText, picker, box, bar;
 
-function uploadFile(fileList) {
-	if (fileList == null || fileList.length == 0) {
-		return;
-	}
-
+function uploadSingle(file) {
 	disable();
 
-	var file = fileList[0];
-	var x    = new XMLHttpRequest();
+	var x = new XMLHttpRequest();
 
 	bar.style.width = '0%';
 	box.classList.remove('active');
@@ -89,11 +86,10 @@ function uploadFile(fileList) {
 	dropZone.addEventListener('click', cancel, false);
 
 	x.addEventListener('load', function(e) {
+		var resp = JSON.parse(this.responseText);
 		if (this.status !== 201) {
-			var err = JSON.parse(this.responseText);
-			showMessage($('#upload'), err.Err, 'bad');
+			showMessage($('#upload'), resp.Err, 'bad');
 		} else {
-			var resp = JSON.parse(this.responseText);
 			box.classList.add('active');
 			box.value = window.location.protocol + '//' + resp.URL;
 			box.select();
@@ -112,6 +108,99 @@ function uploadFile(fileList) {
 	x.send(file);
 }
 
+function uploadMultiple(fileList) {
+	var totalSize = 0;
+	for (var i = 0; i < fileList.length; i++) {
+		totalSize += fileList[i].size;
+	}
+
+	var svg = dropZone.querySelector('svg');
+	if (svg == null) {
+		svg = makesvg('svg');
+		dropZone.appendChild(svg);
+	}
+	while (svg.hasChildNodes()) svg.removeChild(svg.firstChild)
+
+	for (var i = acc = 0, pos; i < fileList.length; i++) {
+		acc += fileList[i].size;
+		pos = acc/totalSize * dropZone.offsetWidth;
+		var line = makesvg('line');
+		line.setAttribute('x1', pos);
+		line.setAttribute('x2', pos);
+		line.setAttribute('y1', 0);
+		line.setAttribute('y2', dropZone.offsetHeight - 8);
+		svg.appendChild(line);
+	}
+
+	bar.style.width = '0%';
+	box.classList.remove('active');
+	dropZone.classList.add('active');
+
+	var err = null;
+	var x = null;
+
+	var cancel = function() {
+		if (x != null) {
+			x.abort();
+			dropZone.removeEventListener(cancel);
+			finish();
+		}
+		if (svg != null) {
+			while (svg.hasChildNodes()) svg.removeChild(svg.firstChild);
+		}
+	};
+	dropZone.removeEventListener('click', clickPicker);
+	dropZone.addEventListener('click', cancel, false);
+
+	dropZoneText.dataset.oldText = dropZoneText.innerText;
+	dropZoneText.innerText = 'Cancel';
+
+	var next = function(i, result, totalLoaded) {
+		if (i < fileList.length) {
+			var file = fileList[i];
+			x = new XMLHttpRequest();
+
+			x.upload.addEventListener('progress', function(e) {
+				if (e.lengthComputable) {
+					bar.style.width = ((totalLoaded + e.loaded)*100 / totalSize) + '%';
+				}
+			}, false);
+
+			x.upload.addEventListener('load', function() {
+				totalLoaded += file.size;
+				bar.style.width = totalLoaded*100 / totalSize + '%';
+			}, false);
+
+			x.addEventListener('load', function(e) {
+				if (this.status !== 201) {
+					var err = JSON.parse(this.responseText);
+					showMessage($('#upload'), err.Err, 'bad');
+				} else {
+					var resp = JSON.parse(this.responseText);
+					result.push(window.location.protocol + '//' + resp.URL);
+					setTimeout(next, 1, i+1, result, totalLoaded);
+				}
+			}, false);
+
+			x.open('POST', '/upload/web', true);
+			x.setRequestHeader('X-Airlift-Filename', encodeURIComponent(file.name));
+			x.send(file);
+		} else {
+			finish();
+			box.classList.add('active');
+			box.value = result.join(' ');
+			box.select();
+			box.focus();
+			box.setSelectionRange(0, box.value.length);
+			dropZone.removeEventListener('click', cancel);
+			dropZone.addEventListener('click', clickPicker);
+			while (svg.hasChildNodes()) svg.removeChild(svg.firstChild);
+		}
+	};
+
+	next(0, [], 0);
+}
+
 function dropZoneEnter(e) {
 	e.preventDefault();
 	e.stopPropagation();
@@ -127,7 +216,24 @@ function dropZoneLeave(e) {
 function dropped(e) {
 	e.stopPropagation();
 	e.preventDefault();
-	uploadFile(e.dataTransfer.files);
+	uploadFiles(e.dataTransfer.files);
+}
+
+function uploadFiles(fileList) {
+	if (fileList == null) {
+		return;
+	}
+
+	switch (fileList.length) {
+	case 0:
+		break;
+	case 1:
+		uploadSingle(fileList[0]);
+		break;
+	default:
+		uploadMultiple(fileList);
+		break;
+	}
 }
 
 function finish() {
@@ -164,7 +270,7 @@ function setupUploader() {
 	bar = dropZone.querySelector('.progress-bar');
 
 	picker.addEventListener('change', function(e) {
-		uploadFile(this.files);
+		uploadFiles(this.files);
 	}, false);
 
 	enable();

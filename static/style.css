@@ -286,6 +286,14 @@ input:focus {
 	background: #fa8;
 	color: #fff;
 }
+#drop-zone svg {
+	width: 100%;
+	height: 128px;
+}
+#drop-zone svg line {
+	stroke: #c64;
+	stroke-width: 2;
+}
 .progress-bar {
 	position: absolute;
 	left: 0;
