@@ -96,6 +96,28 @@ func (c *Cache) Serve() {
 		select {
 		case id := <-c.req:
 			if _, ok := c.files[id]; ok {
+				// freshen thumb on request if original file changed
+				origPath := c.store.Get(id)
+				thumbPath := c.thumbPath(id)
+
+				origFi, err := os.Stat(origPath)
+				if err != nil {
+					c.getThumb(id)
+					break
+				}
+
+				thumbFi, err := os.Stat(thumbPath)
+				if err != nil {
+					c.getThumb(id)
+					break
+				}
+
+				if origFi.ModTime().After(thumbFi.ModTime()) {
+					c.getThumb(id)
+					break
+				}
+
+				// serve existing thumb if already fresh
 				ch := make(chan string)
 				c.resp <- ch
 				ch <- c.thumbPath(id)
