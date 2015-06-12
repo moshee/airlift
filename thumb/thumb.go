@@ -308,10 +308,10 @@ func FormatSupported(ext string) bool {
 func thumbDimensions(wDest, hDest, wSrc, hSrc int) (w, h int) {
 	if wSrc > hSrc {
 		w = wDest
-		h = (hSrc * hDest / wSrc)
+		h = hSrc * wDest / wSrc
 	} else {
 		h = hDest
-		w = (wSrc * wDest / hSrc)
+		w = wSrc * hDest / hSrc
 	}
 
 	return
