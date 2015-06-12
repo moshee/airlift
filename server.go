@@ -100,7 +100,7 @@ func main() {
 	}
 	thumbDir := filepath.Join(appDir, "thumb-cache")
 	thumbEnc := thumb.JPEGEncoder{&jpeg.Options{Quality: 88}}
-	thumbCache, err = thumb.NewCache(thumbDir, thumbEnc, fileCache)
+	thumbCache, err = thumb.NewCache(thumbDir, thumbEnc, fileCache, 100, 100)
 	if err != nil {
 		log.Fatalln("thumb cache:", err)
 	}

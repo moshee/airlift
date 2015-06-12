@@ -14,13 +14,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nfnt/resize"
 	"golang.org/x/image/bmp"
+	"golang.org/x/image/draw"
 	"golang.org/x/image/tiff"
 	"golang.org/x/image/webp"
 )
-
-const ThumbSize = 100
 
 // Encoder describes a way to encode a thumbnail image.
 type Encoder interface {
@@ -55,9 +53,14 @@ type Cache struct {
 	remove   chan string      // send ID, or empty string to purge all
 	resp     chan interface{} // file path
 	inflight map[string][]chan string
+	w        int
+	h        int
 }
 
-func NewCache(dirPath string, enc Encoder, store FileStore) (*Cache, error) {
+// NewCache initializes a new thumbnail generator that stores files encoded
+// from store by enc in dirPath. w and h determine the maximum dimensions of
+// the thumbnails.
+func NewCache(dirPath string, enc Encoder, store FileStore, w, h int) (*Cache, error) {
 	c := &Cache{
 		dir:      dirPath,
 		enc:      enc,
@@ -67,6 +70,8 @@ func NewCache(dirPath string, enc Encoder, store FileStore) (*Cache, error) {
 		remove:   make(chan string),
 		resp:     make(chan interface{}),
 		inflight: make(map[string][]chan string),
+		w:        w,
+		h:        h,
 	}
 
 	os.MkdirAll(dirPath, 0755)
@@ -188,6 +193,7 @@ func (c *Cache) getThumb(id string) {
 		}
 
 		p := c.thumbPath(id)
+		os.MkdirAll(filepath.Dir(p), 0755)
 		dst, err := os.Create(p)
 		if err != nil {
 			log.Print("getThumb: ", err)
@@ -199,7 +205,9 @@ func (c *Cache) getThumb(id string) {
 			log.Print("getThumb: ", err)
 			return
 		}
-		thumb := resize.Thumbnail(ThumbSize, ThumbSize, img, resize.Bilinear)
+
+		//thumb := resize.Thumbnail(c.w, c.h, img, resize.Bilinear)
+		thumb := produceThumbnail(img, c.w, c.h)
 		if err := c.enc.Encode(dst, thumb); err != nil {
 			os.Remove(p)
 			log.Print("getThumb: ", err)
@@ -281,4 +289,27 @@ var decodeFuncMap = map[string]func(io.Reader) (image.Image, error){
 func DecodeFunc(name string) func(io.Reader) (image.Image, error) {
 	ext := strings.ToLower(filepath.Ext(name))
 	return decodeFuncMap[ext]
+}
+
+func thumbDimensions(wDest, hDest, wSrc, hSrc int) (w, h int) {
+	if wSrc > hSrc {
+		w = wDest
+		h = (hSrc * hDest / wSrc)
+	} else {
+		h = hDest
+		w = (wSrc * wDest / hSrc)
+	}
+
+	return
+}
+
+func produceThumbnail(src image.Image, w, h int) image.Image {
+	wSrc, hSrc := src.Bounds().Dx(), src.Bounds().Dy()
+	if wSrc <= w && hSrc <= h {
+		return src
+	}
+	w, h = thumbDimensions(w, h, wSrc, hSrc)
+	thumb := image.NewNRGBA(image.Rect(0, 0, w, h))
+	draw.BiLinear.Scale(thumb, thumb.Bounds(), src, src.Bounds(), draw.Src, nil)
+	return thumb
 }
