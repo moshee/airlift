@@ -150,6 +150,8 @@ func (c *Cache) thumbPath(id string) string {
 // Get the file path to the thumbnail of the file with the given id. Generate
 // it if it doesn't exist already. If concurrent requests are made to the same
 // non-existent thumbnail, it will only be generated once.
+//
+// TODO: error handling
 func (c *Cache) Get(id string) string {
 	c.req <- id
 	resp := (<-c.resp).(chan string)
@@ -289,6 +291,18 @@ var decodeFuncMap = map[string]func(io.Reader) (image.Image, error){
 func DecodeFunc(name string) func(io.Reader) (image.Image, error) {
 	ext := strings.ToLower(filepath.Ext(name))
 	return decodeFuncMap[ext]
+}
+
+// FormatSupported returns true if the given file extension belongs to an image
+// format that can be thumbnailed by this package.
+func FormatSupported(ext string) bool {
+	ext = strings.ToLower(ext)
+	for supportedExt := range decodeFuncMap {
+		if ext == supportedExt {
+			return true
+		}
+	}
+	return false
 }
 
 func thumbDimensions(wDest, hDest, wSrc, hSrc int) (w, h int) {
