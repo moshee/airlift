@@ -18,6 +18,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/image/draw"
+
 	//_ "net/http/pprof"
 
 	"ktkr.us/pkg/airlift/cache"
@@ -100,7 +102,7 @@ func main() {
 	}
 	thumbDir := filepath.Join(appDir, "thumb-cache")
 	thumbEnc := thumb.JPEGEncoder{&jpeg.Options{Quality: 88}}
-	thumbCache, err = thumb.NewCache(thumbDir, thumbEnc, fileCache, 100, 100)
+	thumbCache, err = thumb.NewCache(thumbDir, thumbEnc, fileCache, 100, 100, draw.BiLinear)
 	if err != nil {
 		log.Fatalln("thumb cache:", err)
 	}

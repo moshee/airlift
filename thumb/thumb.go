@@ -55,12 +55,13 @@ type Cache struct {
 	inflight map[string][]chan string
 	w        int
 	h        int
+	scaler   draw.Scaler
 }
 
 // NewCache initializes a new thumbnail generator that stores files encoded
 // from store by enc in dirPath. w and h determine the maximum dimensions of
 // the thumbnails.
-func NewCache(dirPath string, enc Encoder, store FileStore, w, h int) (*Cache, error) {
+func NewCache(dirPath string, enc Encoder, store FileStore, w, h int, scaler draw.Scaler) (*Cache, error) {
 	c := &Cache{
 		dir:      dirPath,
 		enc:      enc,
@@ -72,6 +73,7 @@ func NewCache(dirPath string, enc Encoder, store FileStore, w, h int) (*Cache, e
 		inflight: make(map[string][]chan string),
 		w:        w,
 		h:        h,
+		scaler:   scaler,
 	}
 
 	os.MkdirAll(dirPath, 0755)
@@ -209,7 +211,7 @@ func (c *Cache) getThumb(id string) {
 		}
 
 		//thumb := resize.Thumbnail(c.w, c.h, img, resize.Bilinear)
-		thumb := produceThumbnail(img, c.w, c.h)
+		thumb := produceThumbnail(img, c.w, c.h, c.scaler)
 		if err := c.enc.Encode(dst, thumb); err != nil {
 			os.Remove(p)
 			log.Print("getThumb: ", err)
@@ -317,13 +319,13 @@ func thumbDimensions(wDest, hDest, wSrc, hSrc int) (w, h int) {
 	return
 }
 
-func produceThumbnail(src image.Image, w, h int) image.Image {
+func produceThumbnail(src image.Image, w, h int, s draw.Scaler) image.Image {
 	wSrc, hSrc := src.Bounds().Dx(), src.Bounds().Dy()
 	if wSrc <= w && hSrc <= h {
 		return src
 	}
 	w, h = thumbDimensions(w, h, wSrc, hSrc)
 	thumb := image.NewNRGBA(image.Rect(0, 0, w, h))
-	draw.BiLinear.Scale(thumb, thumb.Bounds(), src, src.Bounds(), draw.Src, nil)
+	s.Scale(thumb, thumb.Bounds(), src, src.Bounds(), draw.Src, nil)
 	return thumb
 }
