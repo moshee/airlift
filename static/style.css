@@ -316,7 +316,7 @@ input:focus {
 }
 #uploaded-urls ul a {
 	font-size: 20px;
-	line-height: 28px;
+	line-height: 32px;
 }
 
 @media screen and (max-width: 600px) {
