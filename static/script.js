@@ -55,7 +55,7 @@ function purgeThumbs() {
 	x.send();
 }
 
-var dropZone, dropZoneText, picker, box, bar;
+var dropZone, dropZoneText, picker, urlList, bar;
 
 function uploadSingle(file) {
 	disable();
@@ -63,7 +63,7 @@ function uploadSingle(file) {
 	var x = new XMLHttpRequest();
 
 	bar.style.width = '0%';
-	box.classList.remove('active');
+	urlList.classList.remove('active');
 	dropZone.classList.add('active');
 
 	x.upload.addEventListener('progress', function(e) {
@@ -90,11 +90,14 @@ function uploadSingle(file) {
 		if (this.status !== 201) {
 			showMessage($('#upload'), resp.Err, 'bad');
 		} else {
+			setURLList([window.location.protocol + '//' + resp.URL]);
+			/*
 			box.classList.add('active');
-			box.value = window.location.protocol + '//' + resp.URL;
+			box.value = 
 			box.select();
 			box.focus();
 			box.setSelectionRange(0, box.value.length);
+		   */
 		}
 		dropZone.removeEventListener('click', cancel);
 		finish();
@@ -133,7 +136,7 @@ function uploadMultiple(fileList) {
 	}
 
 	bar.style.width = '0%';
-	box.classList.remove('active');
+	urlList.classList.remove('active');
 	dropZone.classList.add('active');
 
 	var err = null;
@@ -187,11 +190,14 @@ function uploadMultiple(fileList) {
 			x.send(file);
 		} else {
 			finish();
+			setURLList(result);
+			/*
 			box.classList.add('active');
 			box.value = result.join(' ');
 			box.select();
 			box.focus();
 			box.setSelectionRange(0, box.value.length);
+		   */
 			dropZone.removeEventListener('click', cancel);
 			dropZone.addEventListener('click', clickPicker);
 			while (svg.hasChildNodes()) svg.removeChild(svg.firstChild);
@@ -199,6 +205,20 @@ function uploadMultiple(fileList) {
 	};
 
 	next(0, [], 0);
+}
+
+function setURLList(urls) {
+	var ul = urlList.querySelector('ul');
+	while (ul.hasChildNodes()) ul.removeChild(ul.firstChild);
+	for (var i = 0, url, li, a; url = urls[i]; i++) {
+		li = document.createElement('li');
+		a = document.createElement('a');
+		a.href = url;
+		a.innerText = url;
+		li.appendChild(a);
+		ul.appendChild(li);
+	}
+	urlList.classList.add('active');
 }
 
 function dropZoneEnter(e) {
@@ -266,7 +286,7 @@ function setupUploader() {
 	dropZone = $('#drop-zone');
 	dropZoneText = $('#drop-zone-text');
 	picker = $('#picker');
-	box = $('#uploaded-url');
+	urlList = $('#uploaded-urls');
 	bar = dropZone.querySelector('.progress-bar');
 
 	picker.addEventListener('change', function(e) {

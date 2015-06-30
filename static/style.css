@@ -303,12 +303,20 @@ input:focus {
 	background: #c64;
 	z-index: 1;
 }
-#uploaded-url {
+#uploaded-urls {
 	display: none;
 	margin-top: 32px;
+	text-align: center;
 }
-#uploaded-url.active {
-	display: inline-block;
+#uploaded-urls.active {
+	display: block;
+}
+#uploaded-urls ul {
+	list-style-type: none;
+}
+#uploaded-urls ul a {
+	font-size: 20px;
+	line-height: 28px;
 }
 
 @media screen and (max-width: 600px) {
