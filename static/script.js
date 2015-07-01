@@ -2,6 +2,10 @@ function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return document.querySelectorAll(sel); }
 var timeout;
 
+Node.prototype.sacrificeChildren = function() {
+	while (this.hasChildNodes()) this.removeChild(this.firstChild);
+};
+
 function makesvg(elem) { return document.createElementNS("http://www.w3.org/2000/svg", elem); }
 
 function showMessage(root, msg, classname) {
@@ -57,82 +61,68 @@ function purgeThumbs() {
 
 var dropZone, dropZoneText, picker, urlList, bar;
 
-function uploadSingle(file) {
-	disable();
-
-	var x = new XMLHttpRequest();
-
-	bar.style.width = '0%';
-	urlList.classList.remove('active');
-	dropZone.classList.add('active');
-
-	x.upload.addEventListener('progress', function(e) {
-		if (e.lengthComputable) {
-			bar.style.width = (e.loaded * 100 / e.total) + '%';
-		}
-	}, false);
-
-	x.upload.addEventListener('load', function() {
-		bar.style.width = '100%';
-	}, false);
-
-	dropZone.removeEventListener('click', clickPicker);
-
-	var cancel = function() {
-		x.abort();
-		dropZone.removeEventListener(cancel);
-		finish();
+function setURLList(urls) {
+	var ul = urlList.querySelector('ul');
+	ul.sacrificeChildren();
+	for (var i = 0, url, li, a; url = urls[i]; i++) {
+		li = document.createElement('li');
+		a = document.createElement('a');
+		a.href = url;
+		a.innerText = url;
+		li.appendChild(a);
+		ul.appendChild(li);
 	}
-	dropZone.addEventListener('click', cancel, false);
-
-	x.addEventListener('load', function(e) {
-		var resp = JSON.parse(this.responseText);
-		if (this.status !== 201) {
-			showMessage($('#upload'), resp.Err, 'bad');
-		} else {
-			setURLList([window.location.protocol + '//' + resp.URL]);
-			/*
-			box.classList.add('active');
-			box.value = 
-			box.select();
-			box.focus();
-			box.setSelectionRange(0, box.value.length);
-		   */
-		}
-		dropZone.removeEventListener('click', cancel);
-		finish();
-	}, false);
-
-	dropZoneText.dataset.oldText = dropZoneText.innerText;
-	dropZoneText.innerText = 'Cancel';
-
-	x.open('POST', '/upload/web', true);
-	x.setRequestHeader('X-Airlift-Filename', encodeURIComponent(file.name));
-	x.send(file);
+	urlList.classList.add('active');
 }
 
-function uploadMultiple(fileList) {
+function dropZoneEnter(e) {
+	e.preventDefault();
+	e.stopPropagation();
+	dropZone.classList.add('active');
+}
+
+function dropZoneLeave(e) {
+	e.preventDefault();
+	e.stopPropagation();
+	dropZone.classList.remove('active');
+}
+
+function dropped(e) {
+	e.stopPropagation();
+	e.preventDefault();
+	uploadFiles(e.dataTransfer.files);
+}
+
+function uploadFiles(fileList) {
+	if (fileList == null || fileList.length == 0) {
+		return;
+	}
+
 	var totalSize = 0;
 	for (var i = 0; i < fileList.length; i++) {
 		totalSize += fileList[i].size;
 	}
 
-	var svg = dropZone.querySelector('svg');
-	if (svg == null) {
-		svg = makesvg('svg');
-		dropZone.appendChild(svg);
-	}
-	while (svg.hasChildNodes()) svg.removeChild(svg.firstChild)
+	var svg = null;
 
-	for (var i = acc = 0, pos; i < fileList.length; i++) {
-		acc += fileList[i].size;
-		pos = acc/totalSize * dropZone.offsetWidth;
-		var line = makesvg('line');
-		line.setAttribute('x1', pos);
-		line.setAttribute('x2', pos);
-		line.setAttribute('y1', 0);
-		line.setAttribute('y2', dropZone.offsetHeight - 8);
-		svg.appendChild(line);
+	if (fileList.length > 1) {
+		svg = dropZone.querySelector('svg');
+		if (svg == null) {
+			svg = makesvg('svg');
+			dropZone.appendChild(svg);
+		}
+		while (svg.hasChildNodes()) svg.removeChild(svg.firstChild)
+
+		for (var i = acc = 0, pos; i < fileList.length; i++) {
+			acc += fileList[i].size;
+			pos = acc/totalSize * dropZone.offsetWidth;
+			var line = makesvg('line');
+			line.setAttribute('x1', pos);
+			line.setAttribute('x2', pos);
+			line.setAttribute('y1', 0);
+			line.setAttribute('y2', dropZone.offsetHeight - 8);
+			svg.appendChild(line);
+		}
 	}
 
 	bar.style.width = '0%';
@@ -149,7 +139,7 @@ function uploadMultiple(fileList) {
 			finish();
 		}
 		if (svg != null) {
-			while (svg.hasChildNodes()) svg.removeChild(svg.firstChild);
+			svg.sacrificeChildren();
 		}
 	};
 	dropZone.removeEventListener('click', clickPicker);
@@ -191,69 +181,15 @@ function uploadMultiple(fileList) {
 		} else {
 			finish();
 			setURLList(result);
-			/*
-			box.classList.add('active');
-			box.value = result.join(' ');
-			box.select();
-			box.focus();
-			box.setSelectionRange(0, box.value.length);
-		   */
 			dropZone.removeEventListener('click', cancel);
 			dropZone.addEventListener('click', clickPicker);
-			while (svg.hasChildNodes()) svg.removeChild(svg.firstChild);
+			if (svg != null) {
+				svg.sacrificeChildren();
+			}
 		}
 	};
 
 	next(0, [], 0);
-}
-
-function setURLList(urls) {
-	var ul = urlList.querySelector('ul');
-	while (ul.hasChildNodes()) ul.removeChild(ul.firstChild);
-	for (var i = 0, url, li, a; url = urls[i]; i++) {
-		li = document.createElement('li');
-		a = document.createElement('a');
-		a.href = url;
-		a.innerText = url;
-		li.appendChild(a);
-		ul.appendChild(li);
-	}
-	urlList.classList.add('active');
-}
-
-function dropZoneEnter(e) {
-	e.preventDefault();
-	e.stopPropagation();
-	dropZone.classList.add('active');
-}
-
-function dropZoneLeave(e) {
-	e.preventDefault();
-	e.stopPropagation();
-	dropZone.classList.remove('active');
-}
-
-function dropped(e) {
-	e.stopPropagation();
-	e.preventDefault();
-	uploadFiles(e.dataTransfer.files);
-}
-
-function uploadFiles(fileList) {
-	if (fileList == null) {
-		return;
-	}
-
-	switch (fileList.length) {
-	case 0:
-		break;
-	case 1:
-		uploadSingle(fileList[0]);
-		break;
-	default:
-		uploadMultiple(fileList);
-		break;
-	}
 }
 
 function finish() {
