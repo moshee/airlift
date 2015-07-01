@@ -111,11 +111,11 @@ function uploadFiles(fileList) {
 			svg = makesvg('svg');
 			dropZone.appendChild(svg);
 		}
-		while (svg.hasChildNodes()) svg.removeChild(svg.firstChild)
+		svg.sacrificeChildren();
 
 		for (var i = acc = 0, pos; i < fileList.length; i++) {
 			acc += fileList[i].size;
-			pos = acc/totalSize * dropZone.offsetWidth;
+			pos = acc/totalSize * svg.offsetWidth;
 			var line = makesvg('line');
 			line.setAttribute('x1', pos);
 			line.setAttribute('x2', pos);
