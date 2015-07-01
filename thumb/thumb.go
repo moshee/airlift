@@ -96,7 +96,7 @@ func NewCache(dirPath string, enc Encoder, store FileStore, w, h int, scaler dra
 	return c, nil
 }
 
-// Listen starts the cache request server, blocking forever. It should be
+// Serve starts the cache request server, blocking forever. It should be
 // launched in its own goroutine before any requests are made.
 func (c *Cache) Serve() {
 	for {
@@ -107,14 +107,16 @@ func (c *Cache) Serve() {
 				origPath := c.store.Get(id)
 				thumbPath := c.thumbPath(id)
 
-				origFi, err := os.Stat(origPath)
+				thumbFi, err := os.Stat(thumbPath)
 				if err != nil {
+					log.Print(err)
 					c.getThumb(id)
 					break
 				}
 
-				thumbFi, err := os.Stat(thumbPath)
+				origFi, err := os.Stat(origPath)
 				if err != nil {
+					log.Print(err)
 					c.getThumb(id)
 					break
 				}
