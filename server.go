@@ -59,6 +59,7 @@ func init() {
 	config.Default = config.Config{
 		Host:      "",
 		Port:      60606,
+		HashLen:   4,
 		Directory: filepath.Join(appDir, "uploads"),
 	}
 	confPath := filepath.Join(appDir, "config")
@@ -246,7 +247,7 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 		NewPass   string `form:"newpass"`
 		Password  string `form:"password"`
 		Port      int    `form:"port"`
-		HashLen int `form:"hash-len"`
+		HashLen   int    `form:"hash-len"`
 		MaxAge    int    `form:"max-age"`
 		MaxSize   int64  `form:"max-size"`
 	}

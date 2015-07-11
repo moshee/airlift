@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"ktkr.us/pkg/airlift/shorthash"
-
 	"golang.org/x/crypto/sha3"
 )
 
@@ -120,7 +118,7 @@ func (c *Cache) Put(content io.Reader, filename string, conf Config) (string, er
 	}
 	buf := make([]byte, 64)
 	sha.Read(buf)
-	hash := shorthash.Make(buf, 4)
+	hash := conf.ProcessHash(buf)
 
 	if f, exist := c.files[hash]; exist {
 		log.Printf("overwriting existing file: %s (%d -> %d bytes)", f.Name(), f.Size(), n)

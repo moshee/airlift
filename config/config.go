@@ -132,12 +132,11 @@ func Reload() error {
 }
 
 func Load() (*Config, error) {
-	var conf Config
+	conf := Default
 
 	confFile, err := os.Open(confPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			conf = Default
 			err = Save(&conf)
 			if err != nil {
 				return nil, err
@@ -153,6 +152,11 @@ func Load() (*Config, error) {
 		err = json.Unmarshal(b, &conf)
 		if err != nil {
 			return nil, fmt.Errorf("decoding config: %v", err)
+		}
+		// save any new defaults in case the config structure changed
+		err = Save(&conf)
+		if err != nil {
+			return nil, err
 		}
 	}
 
