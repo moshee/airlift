@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 
+	"ktkr.us/pkg/airlift/shorthash"
 	"ktkr.us/pkg/gas/auth"
 )
 
@@ -22,6 +23,8 @@ var (
 	Default      Config
 )
 
+// Init loads the config from disk into memory, creating it if it doesn't exist
+// already.
 func Init(filePath string) error {
 	confPath = filePath
 	var err error
@@ -29,32 +32,59 @@ func Init(filePath string) error {
 	return err
 }
 
+// Config is a global configuration for Airlift.
 type Config struct {
 	Host      string
 	Port      int
 	Password  []byte
 	Salt      []byte
 	Directory string
-	MaxAge    int   // max age of uploads in days
-	MaxSize   int64 // max total size of uploads in MB
+	HashLen   int
+	Age       int   // max age of uploads in days
+	Size      int64 // max total size of uploads in MB
 }
 
-// satisfies gas.User interface
+// Secrets satisfies gas.User interface.
 func (c Config) Secrets() (pass, salt []byte, err error) {
 	return c.Password, c.Salt, nil
 }
 
+// Username satisfies the gas.User interface. It returns nothing, as Airlift
+// doesn't use usernames.
 func (c Config) Username() string {
 	return ""
 }
 
-// Update the config with the new password hash, generating a new random salt
+// MaxAge satisfies the cache.Config interface.
+func (c Config) MaxAge() int { return c.Age }
+
+// MaxSize satisfies the cache.Config interface.
+func (c Config) MaxSize() int64 { return c.Size }
+
+// MaxCount satisfies the cache.Config interface.
+func (c Config) MaxCount() int64 { return 0 }
+
+// Refresh satisfies the cache.Config interface.
+func (c *Config) Refresh() {
+	cc := Get()
+	*c = *cc
+}
+
+func (c *Config) ProcessHash(buf []byte) string {
+	return shorthash.Make(buf, c.HashLen)
+}
+
+// SetPass updates the config with the new password hash, generating a new
+// random salt.
 func (c *Config) SetPass(pass string) {
 	c.Salt = make([]byte, 32)
 	rand.Read(c.Salt)
 	c.Password = auth.Hash([]byte(pass), c.Salt)
 }
 
+// Serve runs a blocking server that sends and recieves configs over channels,
+// saving to disk when it receives a new config. It should be run in its own
+// goroutine.
 func Serve() {
 	for {
 		if sharedConfig == nil {

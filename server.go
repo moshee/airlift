@@ -113,7 +113,7 @@ func main() {
 		}
 	}
 
-	go fileCache.WatchAges()
+	go fileCache.WatchAges(conf)
 	go thumbCache.Serve()
 
 	r := gas.New()
@@ -246,6 +246,7 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 		NewPass   string `form:"newpass"`
 		Password  string `form:"password"`
 		Port      int    `form:"port"`
+		HashLen int `form:"hash-len"`
 		MaxAge    int    `form:"max-age"`
 		MaxSize   int64  `form:"max-size"`
 	}
@@ -276,22 +277,23 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	conf.Host = form.Host
 	conf.Directory = form.Directory
 	conf.Port = form.Port
-	conf.MaxAge = form.MaxAge
-	conf.MaxSize = form.MaxSize
+	//conf.HashLen = form.HashLen
+	conf.Age = form.MaxAge
+	conf.Size = form.MaxSize
 
 	if err := config.Set(conf); err != nil {
 		log.Println(g.Request.Method, "postConfig:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 
-	if conf.MaxSize > 0 {
-		_, err := fileCache.CutToSize(conf.MaxSize * 1024 * 1024)
+	if conf.MaxSize() > 0 {
+		_, err := fileCache.CutToSize(conf.MaxSize() * 1024 * 1024)
 		if err != nil {
 			log.Print(err)
 		}
 	}
-	if conf.MaxAge > 0 {
-		cutoff := time.Now().Add(-time.Duration(conf.MaxAge) * 24 * time.Hour)
+	if conf.MaxAge() > 0 {
+		cutoff := time.Now().Add(-time.Duration(conf.MaxAge()) * 24 * time.Hour)
 		_, err := fileCache.RemoveOlderThan(cutoff)
 		if err != nil {
 			log.Print(err)
@@ -383,7 +385,7 @@ func postFile(g *gas.Gas) (int, gas.Outputter) {
 	}
 	defer g.Body.Close()
 
-	hash, err := fileCache.Put(g.Body, filename)
+	hash, err := fileCache.Put(g.Body, filename, conf)
 	if err != nil {
 		log.Println(g.Request.Method, "postFile:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})

@@ -11,18 +11,28 @@ import (
 	"sync"
 	"time"
 
-	"ktkr.us/pkg/airlift/config"
 	"ktkr.us/pkg/airlift/shorthash"
 
 	"golang.org/x/crypto/sha3"
 )
+
+type Config interface {
+	MaxAge() int
+	MaxSize() int64
+	MaxCount() int64
+	Refresh()
+	ProcessHash(buf []byte) string
+}
 
 // Cache is an extremely naïve, map-based, fully in-memory key-value store
 // configured as a file cache. Only file locations are stored in memory.
 // Persistence is achieved through the file system. It is concurrent-access
 // safe through locking.
 type Cache struct {
+	// OnRemove is an arbitrary callback that is called whenever a file is
+	// successfully removed.
 	OnRemove func(id string)
+
 	*sync.RWMutex
 	size  int64                  // the total size of the files
 	dir   string                 // path of directory where files are stored
@@ -86,7 +96,7 @@ func (c *Cache) Stat(id string) os.FileInfo {
 }
 
 // Put copies a file to disk with the given filename and returns its hash.
-func (c *Cache) Put(content io.Reader, filename string) (string, error) {
+func (c *Cache) Put(content io.Reader, filename string, conf Config) (string, error) {
 	os.MkdirAll(c.dir, 0700)
 	dest := filepath.Join(c.dir, filename)
 	destFile, err := os.OpenFile(dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
@@ -97,14 +107,16 @@ func (c *Cache) Put(content io.Reader, filename string) (string, error) {
 
 	defer destFile.Close()
 
-	sha := sha3.New256()
+	sha := sha3.NewShake256()
 	w := io.MultiWriter(destFile, sha)
 	n, err := io.Copy(w, content)
 	if err != nil {
 		os.Remove(dest)
 		return "", err
 	}
-	hash := shorthash.Make(sha.Sum(nil), 4)
+	buf := make([]byte, 64)
+	sha.Read(buf)
+	hash := shorthash.Make(buf, 4)
 
 	if f, exist := c.files[hash]; exist {
 		log.Printf("overwriting existing file: %s (%d -> %d bytes)", f.Name(), f.Size(), n)
@@ -123,9 +135,9 @@ func (c *Cache) Put(content io.Reader, filename string) (string, error) {
 		return "", err
 	}
 
-	conf := config.Get()
-	if conf.MaxSize > 0 {
-		c.CutToSize(conf.MaxSize * 1024 * 1024)
+	//conf := config.Get()
+	if conf.MaxSize() > 0 {
+		c.CutToSize(conf.MaxSize() * 1024 * 1024)
 	}
 
 	c.Lock()
@@ -277,12 +289,13 @@ func (c *Cache) RemoveAll() error {
 	return nil
 }
 
-func (c *Cache) WatchAges() {
+func (c *Cache) WatchAges(conf Config) {
 	for {
-		conf := config.Get()
+		//conf := config.Get()
+		conf.Refresh()
 		before := time.Now()
-		if conf.MaxAge > 0 {
-			cutoff := before.Add(-time.Duration(conf.MaxAge) * 24 * time.Hour)
+		if conf.MaxAge() > 0 {
+			cutoff := before.Add(-time.Duration(conf.MaxAge()) * 24 * time.Hour)
 			if _, err := c.RemoveOlderThan(cutoff); err != nil {
 				log.Print(err)
 			}
