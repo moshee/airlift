@@ -16,6 +16,7 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+// Config represents the configurable behavior that Cache needs to operate.
 type Config interface {
 	MaxAge() int
 	MaxSize() int64
@@ -39,6 +40,7 @@ type Cache struct {
 	files map[string]os.FileInfo // map[id]filename
 }
 
+// New initializes and returns a new cache object rooted in dirPath.
 func New(dirPath string) (*Cache, error) {
 	c := &Cache{
 		nil,
@@ -68,6 +70,7 @@ func New(dirPath string) (*Cache, error) {
 	return c, nil
 }
 
+// Size returns the total number of bytes taken up by files in the cache.
 func (c *Cache) Size() int64 {
 	c.RLock()
 	defer c.RUnlock()
@@ -89,6 +92,7 @@ func (c *Cache) Get(id string) string {
 	return c.filePath(id)
 }
 
+// Stat returns the os.FileInfo associated with a file.
 func (c *Cache) Stat(id string) os.FileInfo {
 	c.RLock()
 	defer c.RUnlock()
@@ -186,6 +190,8 @@ func (c *Cache) RemoveOlderThan(t time.Time) ([]string, error) {
 	return ids, nil
 }
 
+// MaybeRemoveOlderThan returns the number of files that would be deleted if
+// RemoveOlderThan were to be called.
 func (c *Cache) MaybeRemoveOlderThan(t time.Time) int {
 	c.RLock()
 	defer c.RUnlock()
@@ -289,6 +295,8 @@ func (c *Cache) RemoveAll() error {
 	return nil
 }
 
+// WatchAges starts a blocking server that constantly watches for files to
+// become stale, and then deletes them. It should be run in its own goroutine.
 func (c *Cache) WatchAges(conf Config) {
 	for {
 		//conf := config.Get()
@@ -306,6 +314,7 @@ func (c *Cache) WatchAges(conf Config) {
 	}
 }
 
+// Len returns the number of files in the cache.
 func (c *Cache) Len() int {
 	c.RLock()
 	defer c.RUnlock()
@@ -328,6 +337,8 @@ func (s byModtime) Swap(i, j int) {
 	s.fis[i], s.fis[j] = s.fis[j], s.fis[i]
 }
 
+// SortedIDs returns a slice of every cached file's ID, sorted descending by modification
+// time.
 func (c *Cache) SortedIDs() []string {
 	c.RLock()
 	defer c.RUnlock()
@@ -343,6 +354,7 @@ func (c *Cache) SortedIDs() []string {
 	return s.ids
 }
 
+// SetDir sets the base directory where files will be stored on disk.
 func (c *Cache) SetDir(dir string) {
 	c.Lock()
 	c.dir = dir
