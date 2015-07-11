@@ -3,7 +3,7 @@ package shorthash
 const (
 	Chars      = "abcdefghijklmnopqrstuvwxyzZYXWVUTSRQPONMLKJIHGFEDCBA1234567890"
 	Vowels     = "aeiou"
-	Consonants = "bdfghklmnpqrstvwxyz"
+	Consonants = "bdfghklmnprstvwxyz"
 )
 
 // Make squashes a long hash into a shorter one represented as hashLen base62
