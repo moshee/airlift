@@ -18,7 +18,7 @@ import (
 type Config interface {
 	MaxAge() int
 	MaxSize() int64
-	MaxCount() int64
+	MaxCount() int
 	Refresh()
 	ProcessHash(buf []byte) string
 }
@@ -139,7 +139,19 @@ func (c *Cache) Put(content io.Reader, filename string, conf Config) (string, er
 
 	//conf := config.Get()
 	if conf.MaxSize() > 0 {
-		c.CutToSize(conf.MaxSize() * 1024 * 1024)
+		_, err = c.CutToSize(conf.MaxSize() * 1024 * 1024)
+		if err != nil {
+			os.Remove(dest)
+			return "", err
+		}
+	}
+
+	if conf.MaxCount() > 0 {
+		_, err = c.CutToCount(conf.MaxCount() - 1)
+		if err != nil {
+			os.Remove(dest)
+			return "", err
+		}
 	}
 
 	c.Lock()
@@ -260,6 +272,23 @@ func (c *Cache) MaybeCutToSize(n int64) (m int) {
 		m++
 		s += c.files[ids[i]].Size()
 	}
+	return
+}
+
+// CutCoCount removes the oldest file until the number of files in the cache is
+// less than or equal to n.
+func (c *Cache) CutToCount(n int) (m int, err error) {
+	c.Lock()
+	defer c.Unlock()
+
+	for len(c.files) > n {
+		_, err = c.removeOldest()
+		if err != nil {
+			return
+		}
+		m++
+	}
+
 	return
 }
 

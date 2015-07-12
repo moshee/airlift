@@ -62,7 +62,7 @@ func (c Config) MaxAge() int { return c.Age }
 func (c Config) MaxSize() int64 { return c.Size }
 
 // MaxCount satisfies the cache.Config interface.
-func (c Config) MaxCount() int64 { return 0 }
+func (c Config) MaxCount() int { return 0 }
 
 // Refresh satisfies the cache.Config interface.
 func (c *Config) Refresh() {
