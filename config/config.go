@@ -42,6 +42,7 @@ type Config struct {
 	HashLen   int
 	Age       int   // max age of uploads in days
 	Size      int64 // max total size of uploads in MB
+	AppendExt bool  // append extensions to returned file URLs
 }
 
 // Secrets satisfies gas.User interface.

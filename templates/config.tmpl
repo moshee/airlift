@@ -30,6 +30,11 @@
         <label for="newpass">New password</label>
         <input type="password" id="newpass" name="newpass" placeholder="••••••••">
       </div>
+      <div class="box checkbox" data-tooltip="Enable to append the original file extension to returned links." data-tt-pos="left">
+        <input type="checkbox" id="append-ext" name="append-ext"{{ if .Conf.AppendExt }}checked{{ end }}>
+        <label for="append-ext">Append file extensions</label>
+      </div>
+      <hr>
       <div class="box" id="password-box" data-tooltip="Whatever changes you make, enter your current password here to make sure that you're you. If you haven't set a password yet, though, you don't have to fill it out." data-tt-pos="left">
         <label for="password">Current password</label>
         <input type="password" id="password" name="password" required placeholder="Required">

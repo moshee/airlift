@@ -250,11 +250,13 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 		HashLen   int    `form:"hash-len"`
 		MaxAge    int    `form:"max-age"`
 		MaxSize   int64  `form:"max-size"`
+		AppendExt bool   `form:"append-ext"`
 	}
 
 	if err := g.UnmarshalForm(&form); err != nil {
 		return 400, out.JSON(&Resp{Err: err.Error()})
 	}
+
 	conf := config.Get()
 
 	if conf.Password != nil {
@@ -281,6 +283,7 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	//conf.HashLen = form.HashLen
 	conf.Age = form.MaxAge
 	conf.Size = form.MaxSize
+	conf.AppendExt = form.AppendExt
 
 	if err := config.Set(conf); err != nil {
 		log.Println(g.Request.Method, "postConfig:", err)
@@ -395,6 +398,9 @@ func postFile(g *gas.Gas) (int, gas.Outputter) {
 	host := conf.Host
 	if host == "" {
 		host = g.Request.Host
+	}
+	if conf.AppendExt {
+		hash += filepath.Ext(filename)
 	}
 	return 201, out.JSON(&Resp{URL: path.Join(host, hash)})
 }
@@ -527,9 +533,13 @@ func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 		TotalPages:  l / itemsPerPage,
 	}
 
+	conf := config.Get()
 	for i := range p.List {
 		if thumb.DecodeFunc(p.List[i].Name) != nil {
 			p.List[i].HasThumb = true
+		}
+		if conf.AppendExt {
+			p.List[i].ID += filepath.Ext(p.List[i].Name)
 		}
 	}
 

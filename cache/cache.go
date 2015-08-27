@@ -14,6 +14,8 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+const SHASize = 64
+
 // Config represents the configurable behavior that Cache needs to operate.
 type Config interface {
 	MaxAge() int
@@ -116,7 +118,7 @@ func (c *Cache) Put(content io.Reader, filename string, conf Config) (string, er
 		os.Remove(dest)
 		return "", err
 	}
-	buf := make([]byte, 64)
+	buf := make([]byte, SHASize)
 	sha.Read(buf)
 	hash := conf.ProcessHash(buf)
 

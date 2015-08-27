@@ -106,18 +106,59 @@ input[type=text], input[type=password], input[type=number] {
 	margin: 8px 0;
 	-webkit-appearance: none;
 	-moz-appearance: none;
-	border: none;
+	-ms-appearance: none;
 	background: #fafafa;
 	font-family: clear sans,sans-serif;
 	font-size: 18px;
 	color: #444;
 	border: 1px solid #ccc;
 }
+.checkbox {
+	margin-bottom: 8px;
+}
+.checkbox label {
+	display: inline-block;
+	line-height: 20px;
+}
+input[type=checkbox] {
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	-ms-appearance: none;
+	width: 20px;
+	height: 20px;
+	position: relative;
+	margin-right: 4px;
+	background: #fafafa;
+	border: 1px solid #ccc;
+	border-radius: 2px;
+	vertical-align: bottom;
+}
+input[type=checkbox]:checked {
+	background: #f0f0f0;
+}
+input[type=checkbox]:checked:after {
+	position: absolute;
+	top: 0;
+	left: 0;
+	content: "✓";
+	font-weight: 700;
+	font-size: 18px;
+	line-height: 18px;
+	width: 18px;
+	text-align: center;
+	color: #444;
+}
 input:focus {
 	outline: none;
 	border: 2px solid #888;
 	margin: 7px -1px;
 	padding-right: 7px;
+}
+input[type=checkbox]:focus {
+	margin: -1px 3px -1px -1px;
+	width: 22px;
+	height: 22px;
+	padding-right: 0;
 }
 .box {
 	display: inline-block;
