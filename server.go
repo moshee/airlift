@@ -244,7 +244,7 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	conf.Host = form.Host
 	conf.Directory = form.Directory
 	conf.Port = form.Port
-	//conf.HashLen = form.HashLen
+	conf.HashLen = form.HashLen
 	conf.Age = form.MaxAge
 	conf.Size = form.MaxSize
 	conf.AppendExt = form.AppendExt
@@ -268,6 +268,11 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 		if err != nil {
 			log.Print(err)
 		}
+	}
+	if conf.HashLen < 1 {
+		conf.HashLen = 1
+	} else if conf.HashLen > 64 {
+		conf.HashLen = 64
 	}
 
 	return 204, nil

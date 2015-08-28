@@ -14,13 +14,17 @@
         <label for="port">Port</label>
         <input type="text" id="port" name="port" value="{{ .Conf.Port }}" placeholder="80">
       </div>
-      <div class="box" id="max-age-box" data-tooltip="This is the maximum age of an upload in days. Uploads will be automatically pruned when they reach this age. If left blank or ≤0, no pruning will happen." data-tt-pos="left">
-        <label for="max-age">Max upload age (days)</label>
+      <div class="box col3" id="max-age-box" data-tooltip="This is the maximum age of an upload in days. Uploads will be automatically pruned when they reach this age. If left blank or ≤0, no pruning will happen." data-tt-pos="left">
+        <label for="max-age">Max age (days)</label>
         <input type="number" id="max-age" name="max-age" value="{{ .Conf.Age }}" min="0">
       </div>
-      <div class="box" id="max-size-box" data-tooltip="This is the maximum size of the uploads folder in megabytes. The oldest uploads will be pruned whenever the size reaches this value. If left blank or ≤0, no pruning will happen." data-tt-pos="right">
-        <label for="max-size">Max uploads size (MB)</label>
+      <div class="box col3" id="max-size-box" data-tooltip="This is the maximum size of the uploads folder in megabytes. The oldest uploads will be pruned whenever the size reaches this value. If left blank or ≤0, no pruning will happen." data-tt-pos="right">
+        <label for="max-size">Max size (MB)</label>
         <input type="number" id="max-size" name="max-size" value="{{ .Conf.Size }}" min="0">
+      </div>
+      <div class="box col3" id="hash-len-box" data-tooltip="The length of the ID associated with each file. In general, longer IDs means less collision. Maximum length is 64." data-tt-pos="right">
+        <label for="hash-len">ID size</label>
+        <input type="number" id="hash-len" name="hash-len" value="{{ .Conf.HashLen }}" min="1" max="64">
       </div>
       <div class="box" id="directory-box" data-tooltip="This is the directory on the server in which the uploaded files will reside." data-tt-pos="left">
         <label for="directory">Directory</label>
