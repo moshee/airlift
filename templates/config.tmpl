@@ -34,6 +34,14 @@
         <input type="checkbox" id="append-ext" name="append-ext"{{ if .Conf.AppendExt }}checked{{ end }}>
         <label for="append-ext">Append file extensions</label>
       </div>
+      <div class="box checkbox" data-tooltip="Enable to allow uploads to show Twitter cards with file previews if applicable." data-tt-pos="left">
+        <input type="checkbox" id="twitter-card" name="twitter-card"{{ if .Conf.TwitterCardEnable }}checked{{ end }}>
+        <label for="twitter-card">Enable Twitter Cards</label>
+        <div id="twitter-card--hidden">
+          <label for="twitter-handle">Twitter handle</label>
+          <input type="text" id="twitter-handle" name="twitter-handle" value="{{ .Conf.TwitterHandle }}" required placeholder="@handle">
+        </div>
+      </div>
       <hr>
       <div class="box" id="password-box" data-tooltip="Whatever changes you make, enter your current password here to make sure that you're you. If you haven't set a password yet, though, you don't have to fill it out." data-tt-pos="left">
         <label for="password">Current password</label>

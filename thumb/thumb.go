@@ -4,6 +4,7 @@
 package thumb
 
 import (
+	"fmt"
 	"image"
 	"image/gif"
 	"image/jpeg"
@@ -12,6 +13,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"golang.org/x/image/bmp"
@@ -40,6 +42,17 @@ type FileStore interface {
 	Get(id string) string
 }
 
+type size struct {
+	w, h int
+}
+
+type set map[size]struct{}
+
+type request struct {
+	id string
+	size
+}
+
 // Cache is a lazy, concurrent thumbnail cache for airlift-server with request
 // batching for on-the-fly thumbnail generation. Only file paths are cached in
 // memory.
@@ -48,31 +61,27 @@ type Cache struct {
 	dir      string // path of directory where thumbnails are stored
 	enc      Encoder
 	store    FileStore
-	files    map[string]struct{}
-	req      chan string      // ID
+	files    map[string]set
+	req      chan *request    // ID
 	remove   chan string      // send ID, or empty string to purge all
 	resp     chan interface{} // file path
 	inflight map[string][]chan string
-	w        int
-	h        int
 	scaler   draw.Scaler
 }
 
 // NewCache initializes a new thumbnail generator that stores files encoded
 // from store by enc in dirPath. w and h determine the maximum dimensions of
 // the thumbnails.
-func NewCache(dirPath string, enc Encoder, store FileStore, w, h int, scaler draw.Scaler) (*Cache, error) {
+func NewCache(dirPath string, enc Encoder, store FileStore, scaler draw.Scaler) (*Cache, error) {
 	c := &Cache{
 		dir:      dirPath,
 		enc:      enc,
 		store:    store,
-		files:    make(map[string]struct{}),
-		req:      make(chan string),
+		files:    make(map[string]set),
+		req:      make(chan *request),
 		remove:   make(chan string),
 		resp:     make(chan interface{}),
 		inflight: make(map[string][]chan string),
-		w:        w,
-		h:        h,
 		scaler:   scaler,
 	}
 
@@ -89,11 +98,43 @@ func NewCache(dirPath string, enc Encoder, store FileStore, w, h int, scaler dra
 	for _, fi := range fis {
 		c.size += fi.Size()
 		name := fi.Name()
-		id := name[:len(name)-len(filepath.Ext(name))]
-		c.files[id] = struct{}{}
+		idsize := strings.SplitN(name[:len(name)-len(filepath.Ext(name))], "_", 3)
+		if len(idsize) != 3 {
+			log.Printf("thumb: filename '%s' has wrong format -- removing", name)
+			os.Remove(filepath.Join(dirPath, name))
+			continue
+		}
+		s, err := parseSize(idsize[1], idsize[2])
+		if err != nil {
+			log.Printf("thumb: filename '%s' has wrong size format -- removing", name)
+			os.Remove(filepath.Join(dirPath, name))
+			continue
+		}
+		c.addSize(idsize[0], s)
 	}
 
 	return c, nil
+}
+
+func parseSize(w, h string) (size, error) {
+	wn, err := strconv.Atoi(w)
+	if err != nil {
+		return size{}, err
+	}
+	hn, err := strconv.Atoi(h)
+	if err != nil {
+		return size{}, err
+	}
+	return size{wn, hn}, nil
+}
+
+func (c *Cache) addSize(id string, s size) {
+	set, ok := c.files[id]
+	if !ok {
+		set = make(map[size]struct{})
+	}
+	set[s] = struct{}{}
+	c.files[id] = set
 }
 
 // Serve starts the cache request server, blocking forever. It should be
@@ -101,38 +142,41 @@ func NewCache(dirPath string, enc Encoder, store FileStore, w, h int, scaler dra
 func (c *Cache) Serve() {
 	for {
 		select {
-		case id := <-c.req:
-			if _, ok := c.files[id]; ok {
-				// freshen thumb on request if original file changed
-				origPath := c.store.Get(id)
-				thumbPath := c.thumbPath(id)
+		case req := <-c.req:
+			// check if a thumb of the requested size is already there
+			if dims, ok := c.files[req.id]; ok {
+				if _, ok := dims[req.size]; ok {
+					// freshen thumb on request if original file changed
+					origPath := c.store.Get(req.id)
+					thumbPath := c.thumbPath(req)
 
-				thumbFi, err := os.Stat(thumbPath)
-				if err != nil {
-					log.Print(err)
-					c.getThumb(id)
+					thumbFi, err := os.Stat(thumbPath)
+					if err != nil {
+						log.Print(err)
+						c.getThumb(req)
+						break
+					}
+
+					origFi, err := os.Stat(origPath)
+					if err != nil {
+						log.Print(err)
+						c.getThumb(req)
+						break
+					}
+
+					if origFi.ModTime().After(thumbFi.ModTime()) {
+						c.getThumb(req)
+						break
+					}
+
+					// serve existing thumb if already fresh
+					ch := make(chan string)
+					c.resp <- ch
+					ch <- c.thumbPath(req)
 					break
 				}
-
-				origFi, err := os.Stat(origPath)
-				if err != nil {
-					log.Print(err)
-					c.getThumb(id)
-					break
-				}
-
-				if origFi.ModTime().After(thumbFi.ModTime()) {
-					c.getThumb(id)
-					break
-				}
-
-				// serve existing thumb if already fresh
-				ch := make(chan string)
-				c.resp <- ch
-				ch <- c.thumbPath(id)
-			} else {
-				c.getThumb(id)
 			}
+			c.getThumb(req)
 		case id := <-c.remove:
 			if id == "" {
 				c.resp <- c.doPurge()
@@ -147,8 +191,9 @@ func (c *Cache) Size() int64 {
 	return c.size
 }
 
-func (c *Cache) thumbPath(id string) string {
-	return filepath.Join(c.dir, id) + c.enc.Extension()
+func (c *Cache) thumbPath(req *request) string {
+	basename := fmt.Sprintf("%s_%d_%d", req.id, req.w, req.h)
+	return filepath.Join(c.dir, basename) + c.enc.Extension()
 }
 
 // Get the file path to the thumbnail of the file with the given id. Generate
@@ -156,19 +201,19 @@ func (c *Cache) thumbPath(id string) string {
 // non-existent thumbnail, it will only be generated once.
 //
 // TODO: error handling
-func (c *Cache) Get(id string) string {
-	c.req <- id
+func (c *Cache) Get(id string, w, h int) string {
+	c.req <- &request{id, size{w, h}}
 	resp := (<-c.resp).(chan string)
 	return <-resp
 }
 
-func (c *Cache) getThumb(id string) {
+func (c *Cache) getThumb(req *request) {
 	ch := make(chan string, 1)
 	c.resp <- ch
-	c.inflight[id] = append(c.inflight[id], ch)
+	c.inflight[req.id] = append(c.inflight[req.id], ch)
 	// if there is a request happening on this already, simply add a reciever
 	// to the list and let them wait for it
-	if len(c.inflight[id]) > 1 {
+	if len(c.inflight[req.id]) > 1 {
 		return
 	}
 
@@ -178,13 +223,13 @@ func (c *Cache) getThumb(id string) {
 
 		// once the work is done, send to all the recievers
 		defer func() {
-			for _, ch := range c.inflight[id] {
+			for _, ch := range c.inflight[req.id] {
 				ch <- *path
 			}
-			delete(c.inflight, id)
+			delete(c.inflight, req.id)
 		}()
 
-		src := c.store.Get(id)
+		src := c.store.Get(req.id)
 		decoder := DecodeFunc(src)
 		if decoder == nil {
 			return
@@ -198,7 +243,7 @@ func (c *Cache) getThumb(id string) {
 			return
 		}
 
-		p := c.thumbPath(id)
+		p := c.thumbPath(req)
 		os.MkdirAll(filepath.Dir(p), 0755)
 		dst, err := os.Create(p)
 		if err != nil {
@@ -212,8 +257,7 @@ func (c *Cache) getThumb(id string) {
 			return
 		}
 
-		//thumb := resize.Thumbnail(c.w, c.h, img, resize.Bilinear)
-		thumb := produceThumbnail(img, c.w, c.h, c.scaler)
+		thumb := produceThumbnail(img, req.w, req.h, c.scaler)
 		if err := c.enc.Encode(dst, thumb); err != nil {
 			os.Remove(p)
 			log.Print("getThumb: ", err)
@@ -228,7 +272,8 @@ func (c *Cache) getThumb(id string) {
 		}
 
 		c.size += fi.Size()
-		c.files[id] = struct{}{}
+
+		c.addSize(req.id, req.size)
 		*path = p
 	}()
 }
@@ -252,6 +297,7 @@ func (c *Cache) doPurge() error {
 	return nil
 }
 
+// Remove deletes all sizes of thumbnail of a given file.
 func (c *Cache) Remove(id string) error {
 	c.remove <- id
 	err := <-c.resp
@@ -262,16 +308,24 @@ func (c *Cache) Remove(id string) error {
 }
 
 func (c *Cache) doRemove(id string) error {
-	path := c.thumbPath(id)
-	fi, err := os.Stat(path)
-	if err != nil {
-		return err
+	set, ok := c.files[id]
+	if !ok {
+		return nil
 	}
-	size := fi.Size()
-	if err = os.Remove(path); err != nil {
-		return err
+
+	for s := range set {
+		path := c.thumbPath(&request{id, s})
+		fi, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		size := fi.Size()
+		if err = os.Remove(path); err != nil {
+			return err
+		}
+		c.size -= size
 	}
-	c.size -= size
+
 	delete(c.files, id)
 
 	return nil

@@ -1,0 +1,16 @@
+{{ define "twitterbot" }}
+<!doctype html>
+<html>
+  <head>
+    <title>{{ .ID }}</title>
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="{{ .Handle }}">
+    <meta name="twitter:title" content="{{ .ID }}: {{ .Name }}">
+    <meta name="twitter:description" content="{{ .Size }} / uploaded {{ .Uploaded.Format "2 Jan 2006 15:04" }}">
+    <meta name="twitter:image" content="http://{{ .Host }}/twitterthumb/{{ .ID }}.jpg">
+  </head>
+  <body>
+    hi twitterbot
+  </body>
+</html>
+{{ end }}

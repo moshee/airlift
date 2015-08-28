@@ -250,6 +250,13 @@ input[type=checkbox]:focus {
 	color: #800;
 	border-color: #c44;
 }
+#twitter-card--hidden {
+	margin-top: 8px;
+	display: none;
+}
+input#twitter-card:checked ~ #twitter-card--hidden {
+	display: block;
+}
 
 #history {
 	padding: 64px;

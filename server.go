@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"image/jpeg"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -40,6 +39,14 @@ var (
 
 const (
 	placeholderThumb = "/static/file.svg"
+	thumbWidth       = 100
+	thumbHeight      = 100
+
+	// https://dev.twitter.com/cards/types/summary-large-image
+	// "Images for this Card should be at least 280px in width, and at least
+	// 150px in height. Image must be less than 1MB in size."
+	twitterThumbWidth  = 280
+	twitterThumbHeight = 150
 )
 
 type Resp struct {
@@ -103,7 +110,7 @@ func main() {
 	}
 	thumbDir := filepath.Join(appDir, "thumb-cache")
 	thumbEnc := thumb.JPEGEncoder{&jpeg.Options{Quality: 88}}
-	thumbCache, err = thumb.NewCache(thumbDir, thumbEnc, fileCache, 100, 100, draw.BiLinear)
+	thumbCache, err = thumb.NewCache(thumbDir, thumbEnc, fileCache, draw.BiLinear)
 	if err != nil {
 		log.Fatalln("thumb cache:", err)
 	}
@@ -155,6 +162,7 @@ func main() {
 		Post("/purge/thumbs", checkLogin, purgeThumbs).
 		Post("/purge/all", checkLogin, purgeAll).
 		Get("/thumb/{id}.jpg", checkLogin, getThumb).
+		Get("/twitterthumb/{id}.jpg", getTwitterThumb).
 		Delete("/{id}", checkPassword, deleteFile).
 		Post("/delete/{id}", checkLogin, deleteFile).
 		Get("/{id}/{filename}", getFile).
@@ -162,52 +170,6 @@ func main() {
 		Get("/{id}", getFile).
 		Get("/", checkLogin, getIndex).
 		Ignition()
-}
-
-// header password
-func checkPassword(g *gas.Gas) (int, gas.Outputter) {
-	conf := config.Get()
-
-	if conf.Password != nil {
-		pass := g.Request.Header.Get("X-Airlift-Password")
-		if pass == "" {
-			return 403, out.JSON(&Resp{Err: "password required"})
-		}
-		if !auth.VerifyHash([]byte(pass), conf.Password, conf.Salt) {
-			return 403, out.JSON(&Resp{Err: "incorrect password"})
-		}
-	}
-
-	return g.Continue()
-}
-
-func redirectTLS(g *gas.Gas) (int, gas.Outputter) {
-	if g.TLS == nil && gas.Env.TLSPort > 0 {
-		host := g.Host
-		if h, _, err := net.SplitHostPort(host); err == nil {
-			host = h
-		}
-		port := ""
-		if gas.Env.TLSPort != 443 {
-			port = ":" + strconv.Itoa(gas.Env.TLSPort)
-		}
-		return 302, out.Redirect(fmt.Sprintf("https://%s%s%s", host, port, g.URL.Path))
-	}
-	return g.Continue()
-}
-
-// login cookie
-func checkLogin(g *gas.Gas) (int, gas.Outputter) {
-	conf := config.Get()
-
-	// if there's a password set, only allow user into config if they're logged
-	// in, otherwise it's probably the first run and they need to enter one
-	if conf.Password != nil {
-		if sess, _ := auth.GetSession(g); sess == nil {
-			return 303, out.Reroute("/login", g.URL.Path)
-		}
-	}
-	return g.Continue()
 }
 
 func getConfig(g *gas.Gas) (int, gas.Outputter) {
@@ -242,15 +204,17 @@ func getConfigOverview(g *gas.Gas) (int, gas.Outputter) {
 
 func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	var form struct {
-		Host      string `form:"host"`
-		Directory string `form:"directory"`
-		NewPass   string `form:"newpass"`
-		Password  string `form:"password"`
-		Port      int    `form:"port"`
-		HashLen   int    `form:"hash-len"`
-		MaxAge    int    `form:"max-age"`
-		MaxSize   int64  `form:"max-size"`
-		AppendExt bool   `form:"append-ext"`
+		Host        string `form:"host"`
+		Directory   string `form:"directory"`
+		NewPass     string `form:"newpass"`
+		Password    string `form:"password"`
+		Port        int    `form:"port"`
+		HashLen     int    `form:"hash-len"`
+		MaxAge      int    `form:"max-age"`
+		MaxSize     int64  `form:"max-size"`
+		AppendExt   bool   `form:"append-ext"`
+		TwitterCard bool   `form:"twitter-card"`
+		Handle      string `form:"twitter-handle"`
 	}
 
 	if err := g.UnmarshalForm(&form); err != nil {
@@ -284,6 +248,8 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	conf.Age = form.MaxAge
 	conf.Size = form.MaxSize
 	conf.AppendExt = form.AppendExt
+	conf.TwitterCardEnable = form.TwitterCard
+	conf.TwitterHandle = form.Handle
 
 	if err := config.Set(conf); err != nil {
 		log.Println(g.Request.Method, "postConfig:", err)
@@ -330,18 +296,6 @@ func postLogin(g *gas.Gas) (int, gas.Outputter) {
 	return reroute(g)
 }
 
-// return to the URL that sent the reroute
-func reroute(g *gas.Gas) (int, gas.Outputter) {
-	out.CheckReroute(g)
-	var path string
-	err := out.Recover(g, &path)
-	if err != nil {
-		log.Print("reroute error: ", err)
-		path = "/config"
-	}
-	return 302, out.Redirect(path)
-}
-
 func getLogout(g *gas.Gas) (int, gas.Outputter) {
 	if err := auth.SignOut(g); err != nil {
 		log.Println(g.Request.Method, "getLogout:", err)
@@ -351,9 +305,41 @@ func getLogout(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func getFile(g *gas.Gas) (int, gas.Outputter) {
-	file := fileCache.Get(g.Arg("id"))
+	id := g.Arg("id")
+	file := fileCache.Get(id)
 	if file == "" {
 		return 404, out.Error(g, errors.New("ID not found"))
+	}
+
+	conf := config.Get()
+	if conf.TwitterCardEnable && thumb.FormatSupported(filepath.Ext(file)) {
+		uas := g.UserAgents()
+		if len(uas) != 0 {
+			for _, ua := range uas {
+				if ua.Name == "Twitterbot" {
+					fi := fileCache.Stat(id)
+					host := conf.Host
+					if host == "" {
+						host = g.Request.Host
+					}
+					return 200, out.HTML("twitterbot", &struct {
+						ID       string
+						Name     string
+						Uploaded time.Time
+						Size     fmtutil.Bytes
+						Host     string
+						Handle   string
+					}{
+						id,
+						strings.SplitN(fi.Name(), ".", 2)[1],
+						fi.ModTime(),
+						fmtutil.Bytes(fi.Size()),
+						host,
+						conf.TwitterHandle,
+					})
+				}
+			}
+		}
 	}
 
 	if g.Arg("filename") == "" {
@@ -434,59 +420,6 @@ func oops(g *gas.Gas) (int, gas.Outputter) {
 	return 200, out.JSON(&Resp{URL: path.Join(host, pruned)})
 }
 
-type File struct {
-	ID       string
-	Name     string
-	Uploaded time.Time
-	HasThumb bool
-	Size     fmtutil.Bytes
-}
-
-func (f *File) Ext() string {
-	ext := filepath.Ext(f.Name)
-	if ext != "" {
-		ext = ext[1:] // remove dot
-	}
-	return ext
-}
-
-func (f *File) Ago() string {
-	n := time.Now().Sub(f.Uploaded)
-	if n < time.Second {
-		return "just now"
-	}
-
-	return fmtutil.LongDuration(n)
-}
-
-func getSortedList(offset, limit int) []*File {
-	ids := fileCache.SortedIDs()
-	if offset > len(ids) {
-		offset = 0
-	}
-	if limit > len(ids)-offset || limit < 0 {
-		limit = len(ids)
-	}
-
-	fileCache.RLock()
-
-	list := make([]*File, limit)
-	ids = ids[len(ids)-limit-offset : len(ids)-offset]
-	for i, id := range ids {
-		fi := fileCache.Stat(id)
-		list[len(list)-i-1] = &File{
-			ID:       id,
-			Name:     strings.SplitN(fi.Name(), ".", 2)[1],
-			Uploaded: fi.ModTime(),
-			Size:     fmtutil.Bytes(fi.Size()),
-		}
-	}
-
-	fileCache.RUnlock()
-
-	return list
-}
-
 func getList(g *gas.Gas) (int, gas.Outputter) {
 	limit, err := strconv.Atoi(g.FormValue("limit"))
 	if err != nil {
@@ -504,6 +437,7 @@ type historyPage struct {
 	NextPage    int
 	PrevPage    int
 	TotalPages  int
+	AppendExt   bool
 }
 
 func getHistory(g *gas.Gas) (int, gas.Outputter) {
@@ -527,19 +461,18 @@ func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 		limit = l - offset
 	}
 
+	conf := config.Get()
+
 	p := &historyPage{
 		List:        getSortedList(offset, limit),
 		CurrentPage: page,
 		TotalPages:  l / itemsPerPage,
+		AppendExt:   conf.AppendExt,
 	}
 
-	conf := config.Get()
 	for i := range p.List {
 		if thumb.DecodeFunc(p.List[i].Name) != nil {
 			p.List[i].HasThumb = true
-		}
-		if conf.AppendExt {
-			p.List[i].ID += filepath.Ext(p.List[i].Name)
 		}
 	}
 
@@ -555,9 +488,18 @@ func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func getThumb(g *gas.Gas) (int, gas.Outputter) {
-	t := thumbCache.Get(g.Arg("id"))
+	t := thumbCache.Get(g.Arg("id"), thumbWidth, thumbHeight)
 	if t == "" {
 		return 302, out.Redirect(placeholderThumb)
+	}
+	http.ServeFile(g, g.Request, t)
+	return g.Stop()
+}
+
+func getTwitterThumb(g *gas.Gas) (int, gas.Outputter) {
+	t := thumbCache.Get(g.Arg("id"), twitterThumbWidth, twitterThumbHeight)
+	if t == "" {
+		return 404, out.Error(g, errors.New("no thumbnail available"))
 	}
 	http.ServeFile(g, g.Request, t)
 	return g.Stop()

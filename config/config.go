@@ -34,15 +34,17 @@ func Init(filePath string) error {
 
 // Config is a global configuration for Airlift.
 type Config struct {
-	Host      string
-	Port      int
-	Password  []byte
-	Salt      []byte
-	Directory string
-	HashLen   int
-	Age       int   // max age of uploads in days
-	Size      int64 // max total size of uploads in MB
-	AppendExt bool  // append extensions to returned file URLs
+	Host              string
+	Port              int
+	Password          []byte
+	Salt              []byte
+	Directory         string
+	HashLen           int
+	Age               int   // max age of uploads in days
+	Size              int64 // max total size of uploads in MB
+	AppendExt         bool  // append extensions to returned file URLs
+	TwitterCardEnable bool  // enable Twitter Card preview for embeddable files
+	TwitterHandle     string
 }
 
 // Secrets satisfies gas.User interface.
