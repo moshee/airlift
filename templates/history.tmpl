@@ -51,8 +51,8 @@
 
 {{ define "pagination" }}
 <nav class="pagination">
-  {{ if ne .CurrentPage 0 }}<a href="/history/{{ .PrevPage }}">Back</a> — {{ end }}
-  <sup>{{ .CurrentPage }}</sup>&frasl;<sub>{{ .TotalPages }}</sub>
-  {{ if ne .NextPage 0 }} — <a href="/history/{{ .NextPage }}">Next</a>{{ end }}
+  <span class="prevnext{{ if gt .CurrentPage 1 }} active{{ end }}"><a href="/history/{{ .PrevPage }}">Back</a> —</span>
+  Page {{ .CurrentPage }} of {{ .TotalPages }}
+  <span class="prevnext{{ if ne .NextPage 0 }} active{{ end }}">— <a href="/history/{{ .NextPage }}">Next</a></span>
 </nav>
 {{ end }}

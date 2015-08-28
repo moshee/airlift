@@ -381,6 +381,16 @@ input#twitter-card:checked ~ #twitter-card--hidden {
 	font-size: 20px;
 	line-height: 32px;
 }
+.pagination {
+	text-align: center;
+	margin: 32px;
+}
+.prevnext {
+	visibility: hidden;
+}
+.prevnext.active {
+	visibility: visible;
+}
 
 @media screen and (max-width: 600px) {
 	body {
@@ -401,10 +411,6 @@ input#twitter-card:checked ~ #twitter-card--hidden {
 	}
 	#history {
 		padding: 8px;
-	}
-	.pagination {
-		text-align: center;
-		margin: 0 32px 16px 0;
 	}
 	.box[data-tooltip]:hover::before, #help:hover ~ .box[data-tooltip]::before {
 		display: none !important;

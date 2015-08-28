@@ -465,10 +465,15 @@ func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 
 	conf := config.Get()
 
+	totalPages := l / itemsPerPage
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
 	p := &historyPage{
 		List:        getSortedList(offset, limit),
-		CurrentPage: page,
-		TotalPages:  l / itemsPerPage,
+		CurrentPage: page + 1,
+		TotalPages:  totalPages,
 		AppendExt:   conf.AppendExt,
 	}
 
