@@ -26,10 +26,6 @@
         <label for="directory">Directory</label>
         <input type="text" id="directory" name="directory" value="{{ .Conf.Directory }}" placeholder="/home/user/uploads">
       </div>
-      <div class="box" id="newpass-box" data-tooltip="Enter a new password here to change your password." data-tt-pos="right">
-        <label for="newpass">New password</label>
-        <input type="password" id="newpass" name="newpass" placeholder="••••••••">
-      </div>
       <div class="box checkbox" data-tooltip="Enable to append the original file extension to returned links." data-tt-pos="left">
         <input type="checkbox" id="append-ext" name="append-ext"{{ if .Conf.AppendExt }}checked{{ end }}>
         <label for="append-ext">Append file extensions</label>
@@ -41,6 +37,10 @@
           <label for="twitter-handle">Twitter handle</label>
           <input type="text" id="twitter-handle" name="twitter-handle" value="{{ .Conf.TwitterHandle }}" required placeholder="@handle">
         </div>
+      </div>
+      <div class="box" id="newpass-box" data-tooltip="Enter a new password here to change your password." data-tt-pos="right">
+        <label for="newpass">New password</label>
+        <input type="password" id="newpass" name="newpass" placeholder="••••••••">
       </div>
       <hr>
       <div class="box" id="password-box" data-tooltip="Whatever changes you make, enter your current password here to make sure that you're you. If you haven't set a password yet, though, you don't have to fill it out." data-tt-pos="left">
