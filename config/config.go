@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
+	"sync"
+	"sync/atomic"
 
 	"ktkr.us/pkg/airlift/shorthash"
 	"ktkr.us/pkg/gas/auth"
@@ -15,21 +16,22 @@ import (
 var OnSave func(*Config)
 
 var (
-	configChan   = make(chan *Config)
-	reloadChan   = make(chan struct{})
-	errChan      = make(chan error)
-	sharedConfig *Config
+	sharedConfig = new(atomic.Value)
 	confPath     string
 	Default      Config
+	mu           = new(sync.RWMutex)
 )
 
 // Init loads the config from disk into memory, creating it if it doesn't exist
 // already.
 func Init(filePath string) error {
 	confPath = filePath
-	var err error
-	sharedConfig, err = Load()
-	return err
+	c, err := Load()
+	if err != nil {
+		return err
+	}
+	sharedConfig.Store(c)
+	return nil
 }
 
 // Config is a global configuration for Airlift.
@@ -85,78 +87,53 @@ func (c *Config) SetPass(pass string) {
 	c.Password = auth.Hash([]byte(pass), c.Salt)
 }
 
-// Serve runs a blocking server that sends and recieves configs over channels,
-// saving to disk when it receives a new config. It should be run in its own
-// goroutine.
-func Serve() {
-	for {
-		if sharedConfig == nil {
-			sharedConfig = &Default
-		}
-		select {
-		case conf := <-configChan:
-			err := Save(conf)
-			errChan <- err
-			if err != nil {
-				log.Printf("Failed to write config: %v", err)
-			} else {
-				log.Printf("Config updated on disk.")
-				sharedConfig = conf
-				if OnSave != nil {
-					OnSave(sharedConfig)
-				}
-			}
-		case configChan <- sharedConfig:
-		case <-reloadChan:
-			conf, err := Load()
-			errChan <- err
-			if err != nil {
-				log.Printf("Failed to reload config: %v", err)
-			} else {
-				log.Print("Reloaded config.")
-				sharedConfig = conf
-			}
-		}
-	}
-}
-
 func Get() *Config {
-	return <-configChan
+	return sharedConfig.Load().(*Config)
 }
 
 func Set(c *Config) error {
-	configChan <- c
-	return <-errChan
+	sharedConfig.Store(c)
+	return Save(c)
 }
 
 func Reload() error {
-	reloadChan <- struct{}{}
-	return <-errChan
+	c, err := Load()
+	if err != nil {
+		return err
+	}
+	Set(c)
+	return nil
 }
 
 func Load() (*Config, error) {
+	mu.RLock()
 	conf := Default
 
 	confFile, err := os.Open(confPath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			mu.RUnlock()
 			err = Save(&conf)
 			if err != nil {
 				return nil, err
 			}
 		} else {
+			mu.RUnlock()
 			return nil, fmt.Errorf("reading config: %v", err)
 		}
 	} else {
 		b, err := ioutil.ReadAll(confFile)
 		if err != nil {
+			mu.RUnlock()
 			return nil, fmt.Errorf("reading config: %v", err)
 		}
 		err = json.Unmarshal(b, &conf)
 		if err != nil {
+			mu.RUnlock()
 			return nil, fmt.Errorf("decoding config: %v", err)
 		}
 		// save any new defaults in case the config structure changed
+		mu.RUnlock()
 		err = Save(&conf)
 		if err != nil {
 			return nil, err
@@ -167,6 +144,8 @@ func Load() (*Config, error) {
 }
 
 func Save(conf *Config) error {
+	mu.Lock()
+	defer mu.Unlock()
 	b, err := json.MarshalIndent(conf, "", "    ")
 	if err != nil {
 		return fmt.Errorf("encoding config: %v", err)

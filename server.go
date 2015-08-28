@@ -69,8 +69,7 @@ func init() {
 		HashLen:   4,
 		Directory: filepath.Join(appDir, "uploads"),
 	}
-	confPath := filepath.Join(appDir, "config")
-	if err := config.Init(confPath); err != nil {
+	if err := config.Init(filepath.Join(appDir, "config")); err != nil {
 		log.Fatal(err)
 	}
 	config.OnSave = func(c *config.Config) {
@@ -99,8 +98,6 @@ func main() {
 	gas.AddDestructor(store.Destroy)
 
 	auth.UseSessionStore(store)
-
-	go config.Serve()
 
 	conf := config.Get()
 	var err error
