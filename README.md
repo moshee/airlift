@@ -131,7 +131,7 @@ megabytes.
 **ID size** [4]: The length of the ID associated with each upload. In general, a longer ID has better collision avoidance properties.
 
 If you manually edit the config file while the server is running, you should
-send the server process a USR2 signal to force a config reload.
+send the server process a SIGHUP to force a config reload.
 
 If the server fails to start with a config error, you probably want to delete
 `~/.airlift-server/config` and reconfigure from scratch.
