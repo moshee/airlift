@@ -78,9 +78,12 @@ func init() {
 
 	flag.Parse()
 
-	gas.Hook(syscall.SIGUSR2, func() {
+	gas.Hook(syscall.SIGHUP, func() {
+		log.Print("reloading config...")
 		if err := config.Reload(); err != nil {
 			log.Print(err)
+		} else {
+			log.Print("reloaded config")
 		}
 	})
 }
