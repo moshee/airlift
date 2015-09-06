@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"flag"
-	"fmt"
 	"image/jpeg"
 	"log"
 	"net/http"
@@ -23,6 +22,7 @@ import (
 
 	"ktkr.us/pkg/airlift/cache"
 	"ktkr.us/pkg/airlift/config"
+	"ktkr.us/pkg/airlift/contentdisposition"
 	"ktkr.us/pkg/airlift/thumb"
 	"ktkr.us/pkg/fmtutil"
 	"ktkr.us/pkg/gas"
@@ -349,13 +349,7 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 
 	if g.Arg("filename") == "" {
 		filename := strings.SplitN(filepath.Base(file), ".", 2)[1]
-		encoded := strings.Replace(url.QueryEscape(filename), "+", "%20", -1)
-		// RFC2616 §2.2 - syntax of quoted strings
-		escaped := strings.Replace(filename, `\`, `\\`, -1)
-		escaped = strings.Replace(escaped, `"`, `\"`, -1)
-		// RFC5987 §3.2.1 - syntax of regular and extended header value encoding
-		disposition := fmt.Sprintf(`filename="%s"; filename*=UTF-8''%s`, escaped, encoded)
-		g.Header().Set("Content-Disposition", disposition)
+		contentdisposition.SetFilename(g, filename)
 	}
 
 	threeMonthsFromNow := time.Now().Add(time.Hour * 24 * 30 * 3)
