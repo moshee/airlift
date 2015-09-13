@@ -392,6 +392,12 @@ input#twitter-card:checked ~ #twitter-card--hidden {
 	visibility: visible;
 }
 
+#version {
+	font-size: 12px;
+	color: #888;
+	text-align: center;
+}
+
 @media screen and (max-width: 600px) {
 	body {
 		padding: 64px 0;

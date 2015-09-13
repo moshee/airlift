@@ -60,9 +60,6 @@ type Resp struct {
 	Err string `json:",omitempty"`
 }
 
-func init() {
-}
-
 func main() {
 	var (
 		flagPort    = flag.Int("p", -1, "Override port in config")
@@ -71,10 +68,14 @@ func main() {
 		flagVersion = flag.Bool("v", false, "Show version and exit")
 	)
 	flag.Parse()
+
 	if *flagVersion {
 		fmt.Println("airlift server", VERSION)
 		return
+	} else {
+		log.Println("this is airlift server", VERSION)
 	}
+
 	u, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
@@ -213,7 +214,7 @@ func getConfig(g *gas.Gas) (int, gas.Outputter) {
 		fmtutil.Bytes(thumbCache.Size()),
 	}
 
-	return 200, out.HTML("config", data, "common")
+	return 200, out.HTML("config", &context{data}, "common")
 }
 
 func getConfigOverview(g *gas.Gas) (int, gas.Outputter) {
@@ -516,7 +517,7 @@ func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 		p.NextPage = page + 1
 	}
 
-	return 200, out.HTML("history", p, "common")
+	return 200, out.HTML("history", &context{p}, "common")
 }
 
 func getThumb(g *gas.Gas) (int, gas.Outputter) {
@@ -578,5 +579,5 @@ func getAgeLimitPrune(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func getIndex(g *gas.Gas) (int, gas.Outputter) {
-	return 200, out.HTML("index", nil, "common")
+	return 200, out.HTML("index", &context{nil}, "common")
 }

@@ -1,4 +1,5 @@
 {{ define "config" }}
+{{ with .Data }}
   <section id="section-overview" class="floating-section">
     {{ template "overview" . }}
   </section>
@@ -141,6 +142,7 @@
       }, false);
     }, false);
   </script>
+{{ end }}
 {{ end }}
 
 {{ define "overview" }}

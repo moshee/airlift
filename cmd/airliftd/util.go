@@ -16,6 +16,14 @@ import (
 	"ktkr.us/pkg/gas/out"
 )
 
+type context struct {
+	Data interface{}
+}
+
+func (c *context) Version() string {
+	return VERSION
+}
+
 // header password
 func checkPassword(g *gas.Gas) (int, gas.Outputter) {
 	conf := config.Get()
