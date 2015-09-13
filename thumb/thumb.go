@@ -4,6 +4,7 @@
 package thumb
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"image/gif"
@@ -86,46 +87,71 @@ func NewCache(dirPath string, enc Encoder, store FileStore, scaler draw.Scaler) 
 	}
 
 	os.MkdirAll(dirPath, 0755)
-	dir, err := os.Open(dirPath)
-	if err != nil {
-		return nil, err
-	}
-	fis, err := dir.Readdir(0)
-	if err != nil {
-		return nil, err
-	}
 
-	for _, fi := range fis {
+	log.Print("thumb: loading cached thumbs...")
+	i := 0
+	filepath.Walk(dirPath, func(path string, fi os.FileInfo, err error) error {
+		if fi.IsDir() {
+			return nil
+		}
 		c.size += fi.Size()
-		name := fi.Name()
-		idsize := strings.SplitN(name[:len(name)-len(filepath.Ext(name))], "_", 3)
-		if len(idsize) != 3 {
-			log.Printf("thumb: filename '%s' has wrong format -- removing", name)
-			os.Remove(filepath.Join(dirPath, name))
-			continue
+
+		// format of filename: <path>_<width>_<height>.<ext>
+		// chop off common prefix
+		relpath, _ := filepath.Rel(dirPath, path)
+		//
+		relpathMinusExt := relpath[:len(relpath)-len(filepath.Ext(relpath))]
+		j := 0
+
+		// locate sizes by second to last
+		sizesPos := strings.LastIndexFunc(relpathMinusExt, func(r rune) bool {
+			if r == '_' {
+				j++
+				if j == 2 {
+					return true
+				}
+			}
+			return false
+		})
+		if sizesPos < 0 {
+			log.Printf("thumb: filename '%s' has wrong format -- removing", relpath)
+			os.Remove(path)
+			return nil
 		}
-		s, err := parseSize(idsize[1], idsize[2])
+
+		sizes := relpathMinusExt[sizesPos+j:]
+		s, err := parseSize(sizes)
 		if err != nil {
-			log.Printf("thumb: filename '%s' has wrong size format -- removing", name)
-			os.Remove(filepath.Join(dirPath, name))
-			continue
+			log.Printf("thumb: filename '%s' has wrong size format -- removing", relpath)
+			os.Remove(path)
+			return nil
 		}
-		c.addSize(idsize[0], s)
-	}
+
+		id := relpathMinusExt[:sizesPos]
+		c.addSize(id, s)
+		i++
+		return nil
+	})
+
+	log.Printf("thumb: loaded %d cached thumbnails", i)
 
 	return c, nil
 }
 
-func parseSize(w, h string) (size, error) {
-	wn, err := strconv.Atoi(w)
+func parseSize(s string) (size, error) {
+	sizes := strings.SplitN(s, "_", 2)
+	if len(sizes) != 2 {
+		return size{}, errors.New("invalid format")
+	}
+	w, err := strconv.Atoi(sizes[0])
 	if err != nil {
 		return size{}, err
 	}
-	hn, err := strconv.Atoi(h)
+	h, err := strconv.Atoi(sizes[1])
 	if err != nil {
 		return size{}, err
 	}
-	return size{wn, hn}, nil
+	return size{w, h}, nil
 }
 
 func (c *Cache) addSize(id string, s size) {
