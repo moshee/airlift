@@ -42,8 +42,7 @@ You can choose to run it behind a frontend server or standalone.
 
 `airlift` [linux/amd64](http://static.displaynone.us/airlift/airlift-linux_amd64.tar.bz2)
 
-(proper cross-compiling is not really worth it because this imports the
-`os/user` package)
+Put the included binary wherever you want in your `$PATH`.
 
 #### Or if you want to build it yourself
 
@@ -59,24 +58,31 @@ in your `$GOPATH`, which should be set (see [here][GOPATH] for more info).
 This can be anywhere that isn't `$GOROOT`; you can set it to any arbitrary
 place like `~/go`. Assuming that's what it is, then
 
-```
-~/go/src/ktkr.us/pkg/airlift$ go build
-~/go/src/ktkr.us/pkg/airlift$ ./airlift
+```shell
+# To enable embedded static files support:
+$ go get ktkr.us/pkg/vfs/cmd/bindata
+$ go generate
+# To build and run airlift:
+$ go build
+$ ./airlift
 ```
 
 to build and run.
 
 [GOPATH]: https://github.com/golang/go/wiki/GOPATH
 
-The binary produced by `go build` will be in your working directory at the
-moment you built it. By default, `go get` will install the binary to
-`$GOPATH/bin` after building. It isn't very useful there, because...
-
 ### Usage
 
-...the server must be run with the `templates` and `static` subdirectories in
-its working directory. Whatever else you do is up to you. Just `$ ./airlift` to
-run it in your terminal. Use your favorite tools to background it.
+The binary produced by `go build` will be in your working directory at the
+moment you built it. By default, `go get` will install the binary to
+`$GOPATH/bin` after building. It isn't very useful there, because the server
+needs a place to find static files.
+
+In normal usage, a binary built after running `go generate` will run
+standalone. Just put it in your `$PATH` and run it.
+
+In development, pass the flag `-rsrc .` to instruct it to load files from disk
+rooted in the working directory.
 
 #### Sample nginx config
 

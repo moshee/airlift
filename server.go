@@ -18,7 +18,7 @@ import (
 
 	"golang.org/x/image/draw"
 
-	//_ "net/http/pprof"
+	_ "net/http/pprof"
 
 	"ktkr.us/pkg/airlift/cache"
 	"ktkr.us/pkg/airlift/config"
@@ -28,13 +28,19 @@ import (
 	"ktkr.us/pkg/gas"
 	"ktkr.us/pkg/gas/auth"
 	"ktkr.us/pkg/gas/out"
+	"ktkr.us/pkg/vfs"
+	"ktkr.us/pkg/vfs/bindata"
 )
 
+//go:generate bindata -skip=*.sw[nop] static templates
+
 var (
-	appDir     string // the place where all the stuff is stored
-	fileCache  *cache.Cache
-	thumbCache *thumb.Cache
-	flagPort   = flag.Int("p", -1, "Override port in config")
+	appDir      string // the place where all the stuff is stored
+	fileCache   *cache.Cache
+	thumbCache  *thumb.Cache
+	flagPort    = flag.Int("p", -1, "Override port in config")
+	flagRsrcDir = flag.String("rsrc", "", "Look for static and template resources in `DIR` (empty = use embedded resources)")
+	flagDebug   = flag.Bool("debug", false, "Enable debug/pprof server")
 )
 
 const (
@@ -63,6 +69,7 @@ func init() {
 	if err := os.MkdirAll(appDir, os.FileMode(0700)); err != nil {
 		log.Fatal(err)
 	}
+
 	config.Default = config.Config{
 		Host:      "",
 		Port:      60606,
@@ -76,8 +83,6 @@ func init() {
 		fileCache.SetDir(c.Directory)
 	}
 
-	flag.Parse()
-
 	gas.Hook(syscall.SIGHUP, func() {
 		log.Print("reloading config...")
 		if err := config.Reload(); err != nil {
@@ -89,11 +94,25 @@ func init() {
 }
 
 func main() {
-	/*
+	flag.Parse()
+	if *flagDebug {
 		go func() {
 			log.Fatal(http.ListenAndServe(":6060", nil))
 		}()
-	*/
+	}
+
+	if *flagRsrcDir != "" {
+		log.Print("using disk filesystem")
+		fs, err := vfs.NewNativeFS(*flagRsrcDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+		out.TemplateFS(fs)
+	} else {
+		log.Print("using binary filesystem")
+		out.TemplateFS(bindata.Root)
+	}
+
 	sessDir := filepath.Join(appDir, "sessions")
 	os.RemoveAll(sessDir)
 	store := &auth.FileStore{Root: sessDir}
@@ -144,7 +163,7 @@ func main() {
 		}(code)
 	}
 
-	r.StaticHandler().
+	r.StaticHandler(*flagRsrcDir).
 		Get("/login", getLogin).
 		Get("/logout", getLogout).
 		Post("/login", postLogin).
