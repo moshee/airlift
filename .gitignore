@@ -1,0 +1,3 @@
+bindata_files
+bindata.go
+version.go

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"image/jpeg"
 	"log"
 	"net/http"
@@ -35,12 +36,11 @@ import (
 //go:generate bindata -skip=*.sw[nop] static templates
 
 var (
-	appDir      string // the place where all the stuff is stored
-	fileCache   *cache.Cache
-	thumbCache  *thumb.Cache
-	flagPort    = flag.Int("p", -1, "Override port in config")
-	flagRsrcDir = flag.String("rsrc", "", "Look for static and template resources in `DIR` (empty = use embedded resources)")
-	flagDebug   = flag.Bool("debug", false, "Enable debug/pprof server")
+	appDir     string // the place where all the stuff is stored
+	fileCache  *cache.Cache
+	thumbCache *thumb.Cache
+
+	VERSION = "devel"
 )
 
 const (
@@ -61,6 +61,20 @@ type Resp struct {
 }
 
 func init() {
+}
+
+func main() {
+	var (
+		flagPort    = flag.Int("p", -1, "Override port in config")
+		flagRsrcDir = flag.String("rsrc", "", "Look for static and template resources in `DIR` (empty = use embedded resources)")
+		flagDebug   = flag.Bool("debug", false, "Enable debug/pprof server")
+		flagVersion = flag.Bool("v", false, "Show version and exit")
+	)
+	flag.Parse()
+	if *flagVersion {
+		fmt.Println("airlift server", VERSION)
+		return
+	}
 	u, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
@@ -91,10 +105,6 @@ func init() {
 			log.Print("reloaded config")
 		}
 	})
-}
-
-func main() {
-	flag.Parse()
 	if *flagDebug {
 		go func() {
 			log.Fatal(http.ListenAndServe(":6060", nil))
@@ -122,7 +132,6 @@ func main() {
 	auth.UseSessionStore(store)
 
 	conf := config.Get()
-	var err error
 	fileCache, err = cache.New(conf.Directory)
 	if err != nil {
 		log.Fatalln("file list:", err)
