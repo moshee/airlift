@@ -21,9 +21,9 @@ instead of this if...
 [cli]: https://github.com/moshee/lift
 [osx]: https://github.com/moshee/AirliftOSX
 
-# airlift
+# airliftd
 
-`airlift` is the Airlift server. You drop the server on any dedicated, VPS,
+`airliftd` is the Airlift server. You drop the server on any dedicated, VPS,
 shared host, whatever, as long as it supports running a binary and gives you
 access to ports or frontend server reverse proxying. A client sends files to it
 and recieves nice URLs to share. The server itself also provides a web-based
@@ -36,47 +36,33 @@ with no system dependencies apart from maybe libc for networking. Just download
 
 You can choose to run it behind a frontend server or standalone. 
 
-### Installing
+## Installing
 
-#### If you just want a binary
+### If you just want a binary
 
-`airlift` [linux/amd64](http://static.displaynone.us/airlift/airlift-linux_amd64.tar.bz2)
+Download a release from [the GitHub Releases tab][1]. Put the included binary
+wherever you want in your `$PATH`.
 
-Put the included binary wherever you want in your `$PATH`.
+[1]: https://github.com/moshee/airlift/releases
 
-#### Or if you want to build it yourself
+### Or if you want to build it yourself
 
 1. [Install Go](http://golang.org/doc/install) and git
-2. `$ mkdir ~/go && export GOPATH=~/go` (you can use any place as your GOPATH)
-3. `$ go get -d -u ktkr.us/pkg/airlift`
+2. `$ mkdir ~/go && export GOPATH=~/go` (you can use any place as your [GOPATH][2])
+3. `$ go get -d -u ktkr.us/pkg/airlift/cmd/airliftd`
+4. `$ airliftd`
+
+[2]: https://github.com/golang/go/wiki/GOPATH
 
 I haven't tried to build or run it on Windows, YMMV. Works on OS X and
 GNU+Linux.
 
-`go get` should clone this repo along with any dependencies and place it
-in your `$GOPATH`, which should be set (see [here][GOPATH] for more info).
-This can be anywhere that isn't `$GOROOT`; you can set it to any arbitrary
-place like `~/go`. Assuming that's what it is, then
+## Updating
 
-```shell
-# To enable embedded static files support:
-$ go get ktkr.us/pkg/vfs/cmd/bindata
-$ go generate
-# To build and run airlift:
-$ go build
-$ ./airlift
-```
+1. Replace binary with new one.
+2. There is no step 2.
 
-to build and run.
-
-[GOPATH]: https://github.com/golang/go/wiki/GOPATH
-
-### Usage
-
-The binary produced by `go build` will be in your working directory at the
-moment you built it. By default, `go get` will install the binary to
-`$GOPATH/bin` after building. It isn't very useful there, because the server
-needs a place to find static files.
+## Usage
 
 In normal usage, a binary built after running `go generate` will run
 standalone. Just put it in your `$PATH` and run it.
@@ -84,7 +70,10 @@ standalone. Just put it in your `$PATH` and run it.
 In development, pass the flag `-rsrc .` to instruct it to load files from disk
 rooted in the working directory.
 
-#### Sample nginx config
+The server runs in the console. You can use whatever tools you want to
+background it.
+
+### Sample nginx config
 
 ```nginx
 server {
@@ -97,7 +86,7 @@ server {
 }
 ```
 
-#### Configuration settings
+### Configuration settings
 
 When you start the server for the first time, it will generate a dotfolder in
 your home directory for local configuration. Visit
@@ -155,7 +144,7 @@ Twitterbot.
 **Twitter handle** []: Twitter Cards require that the Twitter handle of the
 source's creator is included in the metadata.
 
-#### HTTPS
+### HTTPS
 
 In order to use SSL/TLS standalone, set the following environment variables:
 
@@ -168,3 +157,11 @@ In order to use SSL/TLS standalone, set the following environment variables:
 
 If both HTTP and HTTPS are enabled, they will both serve from the same
 executable and HTTP requests will redirect to HTTPS.
+
+## Development
+
+- After making modifications to static assets, use `go generate` in `cmd/airliftd`
+  to create the source files for them
+- After tagging a release, use `cmd/airlift/gen_version.bash` to create the
+  source file with the tagged version
+- Build with `go build`
