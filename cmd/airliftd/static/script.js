@@ -2,11 +2,39 @@ function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return document.querySelectorAll(sel); }
 var timeout;
 
+function setupUploader() {
+	dropZone = $('#drop-zone');
+	dropZoneText = $('#drop-zone-text');
+	picker = $('#picker');
+	urlList = $('#uploaded-urls');
+	bar = dropZone.querySelector('.progress-bar');
+
+	picker.addEventListener('change', function(e) {
+		uploadFiles(this.files);
+	}, false);
+
+	window.addEventListener('paste', function(e) {
+		items = [];
+		for (var i = 0, item; item = e.clipboardData.items[i]; i++) {
+			if (item.kind === 'file') {
+				var blob = item.getAsFile();
+				blob.name = 'Paste ' + new Date().toISOString() + '.png';
+				items.push(blob);
+			}
+		}
+		uploadFiles(items);
+	}, false);
+
+	enable();
+}
+
 Node.prototype.sacrificeChildren = function() {
 	while (this.hasChildNodes()) this.removeChild(this.firstChild);
 };
 
-function makesvg(elem) { return document.createElementNS("http://www.w3.org/2000/svg", elem); }
+function makesvg(elem) {
+	return document.createElementNS("http://www.w3.org/2000/svg", elem);
+}
 
 function showMessage(root, msg, classname) {
 	if (timeout != null) window.clearTimeout(timeout);
@@ -216,18 +244,4 @@ function disable() {
 
 function clickPicker() {
 	picker.click();
-}
-
-function setupUploader() {
-	dropZone = $('#drop-zone');
-	dropZoneText = $('#drop-zone-text');
-	picker = $('#picker');
-	urlList = $('#uploaded-urls');
-	bar = dropZone.querySelector('.progress-bar');
-
-	picker.addEventListener('change', function(e) {
-		uploadFiles(this.files);
-	}, false);
-
-	enable();
 }
