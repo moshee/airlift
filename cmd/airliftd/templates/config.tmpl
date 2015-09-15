@@ -61,7 +61,7 @@
 
     function reloadOverview() {
       var x = new XMLHttpRequest();
-      x.open('GET', '/config/overview', true);
+      x.open('GET', '/-/config/overview', true);
       x.addEventListener('load', function(e) {
         if (e.target.status === 200) {
           $('#section-overview').innerHTML = e.target.response;
