@@ -173,7 +173,7 @@ func main() {
 		}(code)
 	}
 
-	r.StaticHandler("/-/static", *flagRsrcDir).
+	r.StaticHandler("/-", *flagRsrcDir).
 		Get("/-/login", getLogin).
 		Get("/-/logout", getLogout).
 		Post("/-/login", postLogin).
