@@ -113,18 +113,26 @@ func (c *Cache) Put(content io.Reader, filename string, conf Config) (string, er
 
 	sha := sha3.NewShake256()
 	w := io.MultiWriter(destFile, sha)
-	n, err := io.Copy(w, content)
+	_, err = io.Copy(w, content)
 	if err != nil {
 		os.Remove(dest)
 		return "", err
 	}
-	buf := make([]byte, SHASize)
-	sha.Read(buf)
-	hash := conf.ProcessHash(buf)
 
-	if f, exist := c.files[hash]; exist {
-		log.Printf("overwriting existing file: %s (%d -> %d bytes)", f.Name(), f.Size(), n)
-		os.Remove(c.filePath(hash))
+	var (
+		buf  = make([]byte, SHASize)
+		hash string
+	)
+
+	for {
+		sha.Read(buf)
+		hash = conf.ProcessHash(buf)
+
+		if _, exist := c.files[hash]; exist {
+			log.Printf("cache: collision detected with ID '%s' - regenerating", hash)
+		} else {
+			break
+		}
 	}
 
 	destPath := filepath.Join(c.dir, hash+"."+filename)
