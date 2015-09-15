@@ -37,7 +37,9 @@ function makesvg(elem) {
 }
 
 function showMessage(root, msg, classname) {
+	if (root == null) return;
 	if (timeout != null) window.clearTimeout(timeout);
+
 	var box = $('#message-box');
 	if (box == null) {
 		box = document.createElement('div');
@@ -45,7 +47,8 @@ function showMessage(root, msg, classname) {
 	} else {
 		box.parentNode.removeChild(box);
 	}
-	root.insertBefore(box, root.querySelector('h1').nextSibling);
+
+	root.insertBefore(box, root.firstChild.nextSibling);
 	box.className = classname;
 	box.innerText = msg;
 	box.style.display = 'block';
@@ -193,13 +196,18 @@ function uploadFiles(fileList) {
 			}, false);
 
 			x.addEventListener('load', function(e) {
-				if (this.status !== 201) {
-					var err = JSON.parse(this.responseText);
-					showMessage($('#upload'), err.Err, 'bad');
-				} else {
-					var resp = JSON.parse(this.responseText);
-					result.push(window.location.protocol + '//' + resp.URL);
-					setTimeout(next, 1, i+1, result, totalLoaded);
+				try {
+					if (this.status !== 201) {
+						var err = JSON.parse(this.responseText);
+						showMessage($('#upload'), err.Err, 'bad');
+					} else {
+						var resp = JSON.parse(this.responseText);
+						result.push(window.location.protocol + '//' + resp.URL);
+						setTimeout(next, 1, i+1, result, totalLoaded);
+					}
+				} catch (e) {
+					showMessage($('#upload'), 'Server Error: ' + this.statusText, 'bad');
+					console.error('error parsing response: ' + e);
 				}
 			}, false);
 
