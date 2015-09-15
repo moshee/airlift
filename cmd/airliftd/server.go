@@ -173,25 +173,25 @@ func main() {
 		}(code)
 	}
 
-	r.StaticHandler(*flagRsrcDir).
-		Get("/login", getLogin).
-		Get("/logout", getLogout).
-		Post("/login", postLogin).
-		Get("/config", checkLogin, getConfig).
-		Post("/config", checkLogin, postConfig).
-		Post("/config/size", checkLogin, getSizeLimitPrune).
-		Post("/config/age", checkLogin, getAgeLimitPrune).
-		Get("/config/overview", checkLogin, getConfigOverview).
+	r.StaticHandler("/-/static", *flagRsrcDir).
+		Get("/-/login", getLogin).
+		Get("/-/logout", getLogout).
+		Post("/-/login", postLogin).
+		Get("/-/config", checkLogin, getConfig).
+		Post("/-/config", checkLogin, postConfig).
+		Post("/-/config/size", checkLogin, getSizeLimitPrune).
+		Post("/-/config/age", checkLogin, getAgeLimitPrune).
+		Get("/-/config/overview", checkLogin, getConfigOverview).
 		Post("/upload/web", checkLogin, postFile).
 		Post("/upload/file", checkPassword, postFile).
 		Post("/oops", checkPassword, oops).
-		Get("/l", checkPassword, getList).
-		Get("/history", checkLogin, getHistory).
-		Get("/history/{page}", checkLogin, getHistoryPage).
+		Get("/-/l", checkPassword, getList).
+		Get("/-/history", checkLogin, getHistory).
+		Get("/-/history/{page}", checkLogin, getHistoryPage).
 		Post("/purge/thumbs", checkLogin, purgeThumbs).
 		Post("/purge/all", checkLogin, purgeAll).
-		Get("/thumb/{id}.jpg", checkLogin, getThumb).
-		Get("/twitterthumb/{id}.jpg", getTwitterThumb).
+		Get("/-/thumb/{id}.jpg", checkLogin, getThumb).
+		Get("/-/twitterthumb/{id}.jpg", getTwitterThumb).
 		Delete("/{id}", checkPassword, deleteFile).
 		Post("/delete/{id}", checkLogin, deleteFile).
 		Get("/{id}/{filename}", getFile).
@@ -335,7 +335,7 @@ func getLogout(g *gas.Gas) (int, gas.Outputter) {
 		log.Println(g.Request.Method, "getLogout:", err)
 		return 500, out.Error(g, err)
 	}
-	return 302, out.Redirect("/login")
+	return 302, out.Redirect("/-/login")
 }
 
 func getFile(g *gas.Gas) (int, gas.Outputter) {
@@ -469,20 +469,20 @@ type historyPage struct {
 }
 
 func getHistory(g *gas.Gas) (int, gas.Outputter) {
-	return 303, out.Redirect("/history/0")
+	return 303, out.Redirect("/-/history/0")
 }
 
 func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 	page, err := g.IntArg("page")
 	if err != nil || page < 0 {
-		return 303, out.Redirect("/history/0")
+		return 303, out.Redirect("/-/history/0")
 	}
 
 	l := fileCache.Len()
 
 	offset := page * itemsPerPage
 	if offset > l {
-		return 303, out.Redirect("/history/0")
+		return 303, out.Redirect("/-/history/0")
 	}
 	limit := itemsPerPage
 	if l < offset+limit {

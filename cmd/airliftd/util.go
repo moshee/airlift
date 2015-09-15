@@ -64,7 +64,7 @@ func checkLogin(g *gas.Gas) (int, gas.Outputter) {
 	// in, otherwise it's probably the first run and they need to enter one
 	if conf.Password != nil {
 		if sess, _ := auth.GetSession(g); sess == nil {
-			return 303, out.Reroute("/login", g.URL.Path)
+			return 303, out.Reroute("/-/login", g.URL.Path)
 		}
 	}
 	return g.Continue()
@@ -77,7 +77,7 @@ func reroute(g *gas.Gas) (int, gas.Outputter) {
 	err := out.Recover(g, &path)
 	if err != nil {
 		log.Print("reroute error: ", err)
-		path = "/config"
+		path = "/-/config"
 	}
 	return 302, out.Redirect(path)
 }

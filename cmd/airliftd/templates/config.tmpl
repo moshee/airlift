@@ -137,7 +137,7 @@
           }
         }, false);
 
-        x.open('POST', '/config', true);
+        x.open('POST', '/-/config', true);
         x.send(fd);
       }, false);
     }, false);
@@ -147,6 +147,6 @@
 
 {{ define "overview" }}
     <h1>Overview</h1>
-    <p><strong><a href="/history/0">{{ .NumUploads }} upload{{ if ne .NumUploads 1 }}s{{ end }}</a></strong> totalling {{ .UploadsSize }}. (<a href="javascript:purgeAll()">purge</a>)</p>
+    <p><strong><a href="/-/history/0">{{ .NumUploads }} upload{{ if ne .NumUploads 1 }}s{{ end }}</a></strong> totalling {{ .UploadsSize }}. (<a href="javascript:purgeAll()">purge</a>)</p>
     <p>Thumbnail cache is {{ .ThumbsSize }}. (<a href="javascript:purgeThumbs()">purge</a>)</p>
 {{ end }}
