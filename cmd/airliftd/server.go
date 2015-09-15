@@ -267,6 +267,9 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 			return 400, out.JSON(&Resp{Err: "cannot set empty password"})
 		} else {
 			conf.SetPass(form.NewPass)
+			if err := auth.SignIn(g, conf, form.NewPass); err != nil {
+				return 400, out.JSON(&Resp{Err: err.Error()})
+			}
 		}
 	}
 
