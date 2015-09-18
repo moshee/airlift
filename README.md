@@ -94,7 +94,12 @@ server {
 	server_name i.example.com;
 	location / {
 		proxy_pass http://localhost:60606;
+
+		# tell the proxied server its own host (not localhost)
 		proxy_set_header Host $http_host;
+
+		# tell the proxied server the remote host (not localhost either)
+		proxy_set_header X-Forwarded-For $remote_addr;
 	}
 }
 ```
