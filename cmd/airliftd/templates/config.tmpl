@@ -19,21 +19,21 @@
       </div>
       <div class="box checkbox" data-tooltip="Enable to append the original file extension to returned links." data-tt-pos="left">
         <input type="checkbox" id="append-ext" name="append-ext"{{ if .Conf.AppendExt }} checked{{ end }}>
-        <label for="append-ext">Append file extensions</label>
+        <label for="append-ext">Append File Extensions</label>
       </div>
       <div class="box check-enable">
         <input type="checkbox" class="hider" id="enable-age-prune" name="enable-age-prune"{{ if .Conf.MaxAgeEnable }} checked{{ end }}>
-        <label for="enable-age-prune">Limit upload age</label>
+        <label for="enable-age-prune">Limit Upload Age</label>
         <div class="hidee">
-          <label for="max-age">Maximum age (days)</label>
+          <label for="max-age">Maximum Age (Days)</label>
           <input type="number" id="max-age" name="max-age" value="{{ .Conf.Age }}" min="0"{{ if not .Conf.MaxAgeEnable }} disabled{{ end }}>
         </div>
       </div>
       <div class="box check-enable">
         <input type="checkbox" class="hider" id="enable-size-prune" name="enable-size-prune"{{ if .Conf.MaxSizeEnable }} checked{{ end }}>
-        <label for="enable-size-prune">Limit total uploads size</label>
+        <label for="enable-size-prune">Limit Total Uploads Size</label>
         <div class="hidee">
-          <label for="max-size">Maximum size (MB)</label>
+          <label for="max-size">Maximum Size (MB)</label>
           <input type="number" id="max-size" name="max-size" value="{{ .Conf.Size }}" min="0"{{ if not .Conf.MaxSizeEnable }} disabled{{ end }}>
         </div>
       </div>
@@ -41,7 +41,7 @@
         <input type="checkbox" class="hider" name="twitter-card"{{ if .Conf.TwitterCardEnable }} checked{{ end }}>
         <label for="twitter-card">Enable Twitter Cards</label>
         <div class="hidee">
-          <label for="twitter-handle">Twitter handle</label>
+          <label for="twitter-handle">Twitter Handle</label>
           <input type="text" id="twitter-handle" name="twitter-handle" value="{{ .Conf.TwitterHandle }}" required placeholder="@handle"{{ if not .Conf.TwitterCardEnable }} disabled{{ end }}>
         </div>
       </div>
@@ -50,12 +50,12 @@
         <input type="text" id="directory" name="directory" value="{{ .Conf.Directory }}" placeholder="/home/user/uploads">
       </div>
       <div class="box" id="newpass-box" data-tooltip="Enter a new password here to change your password." data-tt-pos="right">
-        <label for="newpass">New password</label>
+        <label for="newpass">New Password</label>
         <input type="password" id="newpass" name="newpass" placeholder="••••••••">
       </div>
       <hr>
       <div class="box" id="password-box" data-tooltip="Current password is required to update configuration" data-tt-pos="left">
-        <label for="password">Current password</label>
+        <label for="password">Current Password</label>
         <input type="password" id="password" name="password" required placeholder="Required">
       </div>
       <button id="submit" type="button">Update configuration</button>
