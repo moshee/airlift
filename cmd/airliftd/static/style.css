@@ -259,15 +259,11 @@ input[type=range]::-ms-fill-upper {
 }
 .box[data-tt-pos=left]::before {
 	right: 100%;
-	/*bottom: 0;*/
-	/*margin-top: 50%;*/
 	margin-right: 16px;
 }
 .box[data-tt-pos=right]::before {
 	left: 100%;
-	/*bottom: 0;*/
 	margin-left: 16px;
-	/*margin-top: 50%;*/
 }
 .box[data-tt-pos=top]::before {
 	left: 50%;
@@ -301,16 +297,6 @@ input[type=range]::-ms-fill-upper {
 * > .col3:nth-of-type(3n) {
 	margin-right: 0;
 }
-
-/*
-#max-age-box {
-	width: 202px;
-	margin-right: 32px;
-}
-#max-size-box {
-	width: 203px;
-}
-*/
 
 #sample-ext {
 	display: none;
