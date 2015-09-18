@@ -162,6 +162,9 @@ will be stored.
 
 **New Password** []: Change your password here.
 
+**Current Password**: Every time you update the config, you need to confirm
+your current password.
+
 ### HTTPS
 
 In order to use SSL/TLS standalone, set the following environment variables:
