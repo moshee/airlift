@@ -36,17 +36,19 @@ func Init(filePath string) error {
 
 // Config is a global configuration for Airlift.
 type Config struct {
-	Host              string
+	Host              string `form:"host"`
 	Port              int
 	Password          []byte
 	Salt              []byte
-	Directory         string
-	HashLen           int
-	Age               int   // max age of uploads in days
-	Size              int64 // max total size of uploads in MB
-	AppendExt         bool  // append extensions to returned file URLs
-	TwitterCardEnable bool  // enable Twitter Card preview for embeddable files
-	TwitterHandle     string
+	Directory         string `form:"directory"`
+	HashLen           int    `form:"id-size"`
+	MaxAgeEnable      bool   `form:"enable-age-prune"`
+	Age               int    `form:"max-age"` // max age of uploads in days
+	MaxSizeEnable     bool   `form:"enable-size-prune"`
+	Size              int64  `form:"max-size"`     // max total size of uploads in MB
+	AppendExt         bool   `form:"append-ext"`   // append extensions to returned file URLs
+	TwitterCardEnable bool   `form:"twitter-card"` // enable Twitter Card preview for embeddable files
+	TwitterHandle     string `form:"twitter-handle"`
 }
 
 // Secrets satisfies gas.User interface.
@@ -61,10 +63,20 @@ func (c Config) Username() string {
 }
 
 // MaxAge satisfies the cache.Config interface.
-func (c Config) MaxAge() int { return c.Age }
+func (c Config) MaxAge() int {
+	if c.MaxAgeEnable {
+		return c.Age
+	}
+	return 0
+}
 
 // MaxSize satisfies the cache.Config interface.
-func (c Config) MaxSize() int64 { return c.Size }
+func (c Config) MaxSize() int64 {
+	if c.MaxSizeEnable {
+		return c.Size
+	}
+	return 0
+}
 
 // MaxCount satisfies the cache.Config interface.
 func (c Config) MaxCount() int { return 0 }
@@ -88,7 +100,9 @@ func (c *Config) SetPass(pass string) {
 }
 
 func Get() *Config {
-	return sharedConfig.Load().(*Config)
+	c := &Config{}
+	*c = *sharedConfig.Load().(*Config)
+	return c
 }
 
 func Set(c *Config) error {

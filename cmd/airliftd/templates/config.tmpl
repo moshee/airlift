@@ -6,147 +6,67 @@
   <section id="section-config" class="floating-section">
     <h1>Configuration</h1>
     <form id="config">
-      <div id="help">?</div>
-      <div class="box" id="host-box" data-tooltip="This is the base host and path that the URL will be appended to and returned when you upload a file. Leave it blank to use whichever host the uploader is accessed from." data-tt-pos="top">
-        <label for="host">Base path</label>
+      <div class="box" id="host-box" data-tooltip="Returned file links will begin with this domain and path." data-tt-pos="top">
+        <label for="host">Base URL</label>
         <input type="text" id="host" name="host" value="{{ .Conf.Host }}" placeholder="i.example.com">
       </div>
-      <div class="box" id="port-box" data-tooltip="This is the port that the server will listen on. You can set it to something other than 80 and set up a proxy with your existing web server." data-tt-pos="right">
-        <label for="port">Port</label>
-        <input type="text" id="port" name="port" value="{{ .Conf.Port }}" placeholder="80">
+      <div class="box" id="id-box">
+        /<span id="sample-id"></span><span id="sample-ext">.ext</span>
       </div>
-      <div class="box col3" id="max-age-box" data-tooltip="This is the maximum age of an upload in days. Uploads will be automatically pruned when they reach this age. If left blank or ≤0, no pruning will happen." data-tt-pos="left">
-        <label for="max-age">Max age (days)</label>
-        <input type="number" id="max-age" name="max-age" value="{{ .Conf.Age }}" min="0">
-      </div>
-      <div class="box col3" id="max-size-box" data-tooltip="This is the maximum size of the uploads folder in megabytes. The oldest uploads will be pruned whenever the size reaches this value. If left blank or ≤0, no pruning will happen." data-tt-pos="right">
-        <label for="max-size">Max size (MB)</label>
-        <input type="number" id="max-size" name="max-size" value="{{ .Conf.Size }}" min="0">
-      </div>
-      <div class="box col3" id="hash-len-box" data-tooltip="The length of the ID associated with each file. In general, longer IDs means less collision. Maximum length is 64." data-tt-pos="right">
-        <label for="hash-len">ID size</label>
-        <input type="number" id="hash-len" name="hash-len" value="{{ .Conf.HashLen }}" min="1" max="64">
-      </div>
-      <div class="box" id="directory-box" data-tooltip="This is the directory on the server in which the uploaded files will reside." data-tt-pos="left">
-        <label for="directory">Directory</label>
-        <input type="text" id="directory" name="directory" value="{{ .Conf.Directory }}" placeholder="/home/user/uploads">
+      <div class="box">
+        <label for="id-size">Length of File ID</label>
+        <input type="range" id="id-size" name="id-size" min="2" max="12" value="{{ .Conf.HashLen }}">
       </div>
       <div class="box checkbox" data-tooltip="Enable to append the original file extension to returned links." data-tt-pos="left">
-        <input type="checkbox" id="append-ext" name="append-ext"{{ if .Conf.AppendExt }}checked{{ end }}>
+        <input type="checkbox" id="append-ext" name="append-ext"{{ if .Conf.AppendExt }} checked{{ end }}>
         <label for="append-ext">Append file extensions</label>
       </div>
-      <div class="box checkbox" data-tooltip="Enable to allow uploads to show Twitter cards with file previews if applicable." data-tt-pos="left">
-        <input type="checkbox" id="twitter-card" name="twitter-card"{{ if .Conf.TwitterCardEnable }}checked{{ end }}>
-        <label for="twitter-card">Enable Twitter Cards</label>
-        <div id="twitter-card--hidden">
-          <label for="twitter-handle">Twitter handle</label>
-          <input type="text" id="twitter-handle" name="twitter-handle" value="{{ .Conf.TwitterHandle }}" required placeholder="@handle">
+      <div class="box check-enable">
+        <input type="checkbox" class="hider" id="enable-age-prune" name="enable-age-prune"{{ if .Conf.MaxAgeEnable }} checked{{ end }}>
+        <label for="enable-age-prune">Limit upload age</label>
+        <div class="hidee">
+          <label for="max-age">Maximum age (days)</label>
+          <input type="number" id="max-age" name="max-age" value="{{ .Conf.Age }}" min="0"{{ if not .Conf.MaxAgeEnable }} disabled{{ end }}>
         </div>
+      </div>
+      <div class="box check-enable">
+        <input type="checkbox" class="hider" id="enable-size-prune" name="enable-size-prune"{{ if .Conf.MaxSizeEnable }} checked{{ end }}>
+        <label for="enable-size-prune">Limit total uploads size</label>
+        <div class="hidee">
+          <label for="max-size">Maximum size (MB)</label>
+          <input type="number" id="max-size" name="max-size" value="{{ .Conf.Size }}" min="0"{{ if not .Conf.MaxSizeEnable }} disabled{{ end }}>
+        </div>
+      </div>
+      <div class="box check-enable" data-tooltip="Enable to allow uploads to show Twitter Cards with file previews if applicable." data-tt-pos="left">
+        <input type="checkbox" class="hider" name="twitter-card"{{ if .Conf.TwitterCardEnable }} checked{{ end }}>
+        <label for="twitter-card">Enable Twitter Cards</label>
+        <div class="hidee">
+          <label for="twitter-handle">Twitter handle</label>
+          <input type="text" id="twitter-handle" name="twitter-handle" value="{{ .Conf.TwitterHandle }}" required placeholder="@handle"{{ if not .Conf.TwitterCardEnable }} disabled{{ end }}>
+        </div>
+      </div>
+      <div class="box" id="directory-box">
+        <label for="directory">Upload Directory</label>
+        <input type="text" id="directory" name="directory" value="{{ .Conf.Directory }}" placeholder="/home/user/uploads">
       </div>
       <div class="box" id="newpass-box" data-tooltip="Enter a new password here to change your password." data-tt-pos="right">
         <label for="newpass">New password</label>
         <input type="password" id="newpass" name="newpass" placeholder="••••••••">
       </div>
       <hr>
-      <div class="box" id="password-box" data-tooltip="Whatever changes you make, enter your current password here to make sure that you're you. If you haven't set a password yet, though, you don't have to fill it out." data-tt-pos="left">
+      <div class="box" id="password-box" data-tooltip="Current password is required to update configuration" data-tt-pos="left">
         <label for="password">Current password</label>
         <input type="password" id="password" name="password" required placeholder="Required">
       </div>
-      <hr>
       <button id="submit" type="button">Update configuration</button>
     </form>
   </section>
-  <script>
-    var oldMaxSize, oldMaxAge;
-
-    function reloadOverview() {
-      var x = new XMLHttpRequest();
-      x.open('GET', '/-/config/overview', true);
-      x.addEventListener('load', function(e) {
-        if (e.target.status === 200) {
-          $('#section-overview').innerHTML = e.target.response;
-        }
-      });
-      x.send();
-    }
-
-    window.addEventListener('load', function() {
-      var buttons = $$('button');
-      oldMaxSize  = parseInt($('#max-size').value);
-      oldMaxAge   = parseInt($('#max-age').value);
-
-
-      $('#submit').addEventListener('click', function() {
-        for (var i = 0, button; button = buttons[i]; i++) button.setAttribute('disabled', true);
-        var maxSize = parseInt($('#max-size').value);
-        var maxAge  = parseInt($('#max-age').value);
-        var delta   = 0;
-
-        var f = function(url, val) {
-          var fd = new FormData();
-          fd.append('N', val);
-          var x = new XMLHttpRequest();
-          x.open('POST', url, false);
-          x.send(fd);
-
-          if (x.status == 200) {
-            var n = JSON.parse(x.response).N;
-            if (n > delta) delta = n;
-            return true;
-          } else {
-            var err = JSON.parse(x.response);
-            showMessage($('#section-config'), 'Server error: ' + err.Err + ' (' + x.status + ')', 'bad');
-            return false;
-          }
-        }
-
-        if (maxSize > 0 && (oldMaxSize == 0 || maxSize < oldMaxSize)) {
-          if (!f('/config/size', maxSize)) return;
-        }
-        if (maxAge > 0 && (oldMaxAge == 0 || maxAge < oldMaxAge)) {
-          if (!f('/config/age', maxAge)) return;
-        }
-        if (delta > 0) {
-          if (!confirm('Changes made to age or size limits mean that ' + delta + ' old file(s) will be pruned. Continue?')) {
-            return;
-          }
-        }
-
-        oldMaxAge = maxAge;
-        oldMaxSize = maxSize;
-
-        var host   = $('#host');
-        host.value = host.value.replace(/\w+:\/\//, '');
-        var fd     = new FormData($('#config'));
-        var x      = new XMLHttpRequest();
-
-        x.addEventListener('load', function(e) {
-          $('#password').value = '';
-          for (var i = 0, button; button = buttons[i]; i++) button.removeAttribute('disabled');
-          if (e.target.status === 204) {
-            showMessage($('#section-config'), 'Configuration updated.', 'good');
-            $('#newpass').value = '';
-            reloadOverview();
-          } else {
-            var resp = JSON.parse(x.responseText);
-            if (resp != null && resp.Err != null) {
-              showMessage($('#section-config'), 'Error: ' + resp.Err, 'bad');
-            } else {
-              showMessage($('#section-config'), 'An unknown error occurred (status ' + e.target.status + ')', 'bad');
-            }
-          }
-        }, false);
-
-        x.open('POST', '/-/config', true);
-        x.send(fd);
-      }, false);
-    }, false);
-  </script>
+  <script>window.addEventListener('load', configPage, false);</script>
 {{ end }}
 {{ end }}
 
 {{ define "overview" }}
     <h1>Overview</h1>
-    <p><strong><a href="/-/history/0">{{ .NumUploads }} upload{{ if ne .NumUploads 1 }}s{{ end }}</a></strong> totalling {{ .UploadsSize }}. (<a href="javascript:purgeAll()">purge</a>)</p>
-    <p>Thumbnail cache is {{ .ThumbsSize }}. (<a href="javascript:purgeThumbs()">purge</a>)</p>
+    <p><strong><a href="/-/history/0">{{ .NumUploads }} upload{{ if ne .NumUploads 1 }}s{{ end }}</a></strong> totalling <strong>{{ .UploadsSize }}</strong>. (<a href="javascript:purgeAll()">purge</a>)</p>
+    <p>Thumbnail cache is <strong>{{ .ThumbsSize }}</strong>. (<a href="javascript:purgeThumbs()">purge</a>)</p>
 {{ end }}

@@ -232,79 +232,69 @@ func getConfigOverview(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func postConfig(g *gas.Gas) (int, gas.Outputter) {
-	var form struct {
-		Host        string `form:"host"`
-		Directory   string `form:"directory"`
-		NewPass     string `form:"newpass"`
-		Password    string `form:"password"`
-		Port        int    `form:"port"`
-		HashLen     int    `form:"hash-len"`
-		MaxAge      int    `form:"max-age"`
-		MaxSize     int64  `form:"max-size"`
-		AppendExt   bool   `form:"append-ext"`
-		TwitterCard bool   `form:"twitter-card"`
-		Handle      string `form:"twitter-handle"`
-	}
+	conf := config.Get()
+	newconf := config.Config{}
 
-	if err := g.UnmarshalForm(&form); err != nil {
+	if err := g.UnmarshalForm(&newconf); err != nil {
 		return 400, out.JSON(&Resp{Err: err.Error()})
 	}
 
-	conf := config.Get()
-
+	pass := g.FormValue("password")
+	newpass := g.FormValue("newpass")
 	if conf.Password != nil {
-		if form.Password == "" {
+		if pass == "" {
 			return 403, out.JSON(&Resp{Err: "you forgot your password"})
 		}
-		if !auth.VerifyHash([]byte(form.Password), conf.Password, conf.Salt) {
+		if !auth.VerifyHash([]byte(pass), conf.Password, conf.Salt) {
 			return 403, out.JSON(&Resp{Err: "incorrect password"})
 		}
-		if form.NewPass != "" {
-			conf.SetPass(form.NewPass)
+		if newpass != "" {
+			conf.SetPass(newpass)
 		}
 	} else {
-		if form.NewPass == "" {
+		if newpass == "" {
 			return 400, out.JSON(&Resp{Err: "cannot set empty password"})
 		} else {
-			conf.SetPass(form.NewPass)
-			if err := auth.SignIn(g, conf, form.NewPass); err != nil {
+			conf.SetPass(newpass)
+			if err := auth.SignIn(g, conf, newpass); err != nil {
 				return 400, out.JSON(&Resp{Err: err.Error()})
 			}
 		}
 	}
 
-	conf.Host = form.Host
-	conf.Directory = form.Directory
-	conf.Port = form.Port
-	conf.HashLen = form.HashLen
-	conf.Age = form.MaxAge
-	conf.Size = form.MaxSize
-	conf.AppendExt = form.AppendExt
-	conf.TwitterCardEnable = form.TwitterCard
-	conf.TwitterHandle = form.Handle
+	newconf.Password = conf.Password
+	newconf.Salt = conf.Salt
+	newconf.Port = conf.Port
 
-	if err := config.Set(conf); err != nil {
+	if newconf.HashLen < 1 {
+		newconf.HashLen = 1
+	} else if newconf.HashLen > 64 {
+		newconf.HashLen = 64
+	}
+
+	if newconf.TwitterCardEnable && newconf.TwitterHandle == "" {
+		return 400, out.JSON(&Resp{Err: "you must provide a Twitter handle to use Twitter Cards"})
+	}
+
+	if err := config.Set(&newconf); err != nil {
 		log.Println(g.Request.Method, "postConfig:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 
-	if conf.MaxSize() > 0 {
-		_, err := fileCache.CutToSize(conf.MaxSize() * 1024 * 1024)
+	conf = config.Get()
+
+	if conf.MaxSizeEnable {
+		_, err := fileCache.CutToSize(conf.Size * 1024 * 1024)
 		if err != nil {
 			log.Print(err)
 		}
 	}
-	if conf.MaxAge() > 0 {
-		cutoff := time.Now().Add(-time.Duration(conf.MaxAge()) * 24 * time.Hour)
+	if conf.MaxAgeEnable {
+		cutoff := time.Now().Add(-time.Duration(conf.Age) * 24 * time.Hour)
 		_, err := fileCache.RemoveOlderThan(cutoff)
 		if err != nil {
 			log.Print(err)
 		}
-	}
-	if conf.HashLen < 1 {
-		conf.HashLen = 1
-	} else if conf.HashLen > 64 {
-		conf.HashLen = 64
 	}
 
 	return 204, nil

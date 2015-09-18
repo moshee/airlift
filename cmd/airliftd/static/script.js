@@ -36,27 +36,18 @@ function makesvg(elem) {
 	return document.createElementNS("http://www.w3.org/2000/svg", elem);
 }
 
-function showMessage(root, msg, classname) {
-	if (root == null) return;
+function showMessage(msg, classname) {
 	if (timeout != null) window.clearTimeout(timeout);
 
 	var box = $('#message-box');
-	if (box == null) {
-		box = document.createElement('div');
-		box.id = 'message-box';
-	} else {
-		box.parentNode.removeChild(box);
-	}
-
-	root.insertBefore(box, root.firstChild.nextSibling);
-	box.className = classname;
 	box.innerText = msg;
-	box.style.display = 'block';
+	box.classList.add(classname);
+	box.classList.add('active')
 	timeout = window.setTimeout(hideMessage, 5000);
 }
 
 function hideMessage() {
-	$('#message-box').style.display = 'none';
+	$('#message-box').classList.remove('active');
 }
 
 function cb(e) {
@@ -65,9 +56,9 @@ function cb(e) {
 	} else {
 		var resp = JSON.parse(e.target.responseText);
 		if (resp != null && resp.Err != null) {
-			showMessage($('#section-overview'), 'Error: ' + resp.Err, 'bad');
+			showMessage('Error: ' + resp.Err, 'bad');
 		} else {
-			showMessage($('#section-overview'), 'An unknown error occurred (status ' + e.target.status + ')', 'bad');
+			showMessage('An unknown error occurred (status ' + e.target.status + ')', 'bad');
 		}
 	}
 }
@@ -199,14 +190,14 @@ function uploadFiles(fileList) {
 				try {
 					if (this.status !== 201) {
 						var err = JSON.parse(this.responseText);
-						showMessage($('#upload'), err.Err, 'bad');
+						showMessage(err.Err, 'bad');
 					} else {
 						var resp = JSON.parse(this.responseText);
 						result.push(window.location.protocol + '//' + resp.URL);
 						setTimeout(next, 1, i+1, result, totalLoaded);
 					}
 				} catch (e) {
-					showMessage($('#upload'), 'Server Error: ' + this.statusText, 'bad');
+					showMessage('Server Error: ' + this.statusText, 'bad');
 					console.error('error parsing response: ' + e);
 				}
 			}, false);
@@ -252,4 +243,125 @@ function disable() {
 
 function clickPicker() {
 	picker.click();
+}
+
+var oldMaxSize, oldMaxAge, sampleID, sampleExt, idSize, addExt;
+
+function reloadOverview() {
+	var x = new XMLHttpRequest();
+	x.open('GET', '/-/config/overview', true);
+	x.addEventListener('load', function(e) {
+		if (e.target.status === 200) {
+			$('#section-overview').innerHTML = e.target.response;
+		}
+	});
+	x.send();
+}
+
+function updateSample() {
+	var a = new Array(parseInt(idSize.value));
+	for (var i = 0; i < a.length; i++) {
+		a[i] = 'X';
+	}
+	sampleID.textContent = sampleID.innerText = a.join('');
+
+	if (addExt.checked) {
+		sampleExt.classList.add('show');
+	} else {
+		sampleExt.classList.remove('show');
+	}
+}
+
+function configPage() {
+	var buttons = $$('button'), host = $('#host');
+	oldMaxSize  = parseInt($('#max-size').value);
+	oldMaxAge   = parseInt($('#max-age').value);
+	sampleID    = $('#sample-id');
+	sampleExt   = $('#sample-ext');
+	idSize      = $('#id-size');
+	addExt      = $('#append-ext');
+
+	if (host.value === '') {
+		host.value = window.location.host;
+	}
+
+	updateSample();
+	// IE and webkit seem to have different change and input impls
+	idSize.addEventListener('change', updateSample, false);
+	idSize.addEventListener('input', updateSample, false);
+	addExt.addEventListener('change', updateSample, false);
+
+	var boxes = $$('.check-enable');
+	for (var i = 0, b; b = boxes[i]; i++) {
+		var hider = b.querySelector('.hider');
+		hider.hidee = b.querySelector('.hidee input');
+		hider.addEventListener('click', function() {
+			this.hidee.disabled = !this.checked;
+		}, false);
+	}
+
+	$('#submit').addEventListener('click', function() {
+		for (var i = 0, button; button = buttons[i]; i++) button.setAttribute('disabled', true);
+		var maxSize = parseInt($('#max-size').value);
+		var maxAge  = parseInt($('#max-age').value);
+		var delta   = 0;
+
+		var f = function(url, val) {
+			var fd = new FormData();
+			fd.append('N', val);
+			var x = new XMLHttpRequest();
+			x.open('POST', url, false);
+			x.send(fd);
+
+			if (x.status == 200) {
+				var n = JSON.parse(x.response).N;
+				if (n > delta) delta = n;
+				return true;
+			} else {
+				var err = JSON.parse(x.response);
+				showMessage('Server error: ' + err.Err + ' (' + x.status + ')', 'bad');
+				return false;
+			}
+		}
+
+		if (maxSize > 0 && (oldMaxSize == 0 || maxSize < oldMaxSize)) {
+			if (!f('/-/config/size', maxSize)) return;
+		}
+		if (maxAge > 0 && (oldMaxAge == 0 || maxAge < oldMaxAge)) {
+			if (!f('/-/config/age', maxAge)) return;
+		}
+		if (delta > 0) {
+			if (!confirm('Changes made to age or size limits mean that ' + delta + ' old file(s) will be pruned. Continue?')) {
+				return;
+			}
+		}
+
+		oldMaxAge = maxAge;
+		oldMaxSize = maxSize;
+
+		var host   = $('#host');
+		host.value = host.value.replace(/\w+:\/\//, '');
+			var fd     = new FormData($('#config'));
+		var x      = new XMLHttpRequest();
+
+		x.addEventListener('load', function(e) {
+			$('#password').value = '';
+			for (var i = 0, button; button = buttons[i]; i++) button.removeAttribute('disabled');
+			if (e.target.status === 204) {
+				showMessage('Configuration updated.', 'good');
+				$('#newpass').value = '';
+				reloadOverview();
+			} else {
+				var resp = JSON.parse(x.responseText);
+				if (resp != null && resp.Err != null) {
+					showMessage('Error: ' + resp.Err, 'bad');
+				} else {
+					showMessage('An unknown error occurred (status ' + e.target.status + ')', 'bad');
+				}
+			}
+		}, false);
+
+		x.open('POST', '/-/config', true);
+		x.send(fd);
+	}, false);
 }
