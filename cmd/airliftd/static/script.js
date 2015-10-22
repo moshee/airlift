@@ -13,19 +13,42 @@ function setupUploader() {
 		uploadFiles(this.files);
 	}, false);
 
-	window.addEventListener('paste', function(e) {
-		items = [];
-		for (var i = 0, item; item = e.clipboardData.items[i]; i++) {
-			if (item.kind === 'file') {
-				var blob = item.getAsFile();
-				blob.name = 'Paste ' + new Date().toISOString() + '.png';
-				items.push(blob);
-			}
-		}
-		uploadFiles(items);
-	}, false);
+	window.addEventListener('paste', paste, false);
 
 	enable();
+}
+
+function paste(e) {
+	var items = [];
+	var i = 0;
+	var item;
+
+	var next = function() {
+		item = e.clipboardData.items[i++];
+		if (item == null) {
+			uploadFiles(items);
+			return;
+		}
+
+		switch (item.kind) {
+		case 'file':
+			var blob = item.getAsFile();
+			blob.name = 'Paste ' + new Date().toISOString() + '.png';
+			items.push(blob);
+			break;
+		case 'string':
+			item.getAsString(function(s) {
+				var blob = new Blob([s]);
+				blob.name = 'Paste ' + new Date().toISOString() + '.txt';
+				items.push(blob);
+				next();
+			});
+			return;
+		}
+		setTimeout(next, 1);
+	}
+
+	next();
 }
 
 Node.prototype.sacrificeChildren = function() {
