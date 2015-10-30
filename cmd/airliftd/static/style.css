@@ -27,6 +27,7 @@ body {
 	text-align: center;
 	width: 100%;
 	margin-bottom: 16px;
+	font-size: 16px;
 }
 .floating-section {
 	margin: 0 auto 16px;
@@ -487,10 +488,11 @@ input#twitter-card:checked ~ #twitter-card--hidden {
 
 #front {
 	text-align: center;
-	margin-bottom: 64px;
 }
 #big-logo {
-	line-height: 512px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
 	height: 512px;
 	color: #aaa;
 	font-size: 32px;
@@ -510,7 +512,7 @@ input#twitter-card:checked ~ #twitter-card--hidden {
 
 @media screen and (max-width: 600px) {
 	body {
-		padding: 64px 0;
+		padding: 32px 0;
 	}
 	.floating-section {
 		width: 100%;
@@ -546,6 +548,11 @@ input#twitter-card:checked ~ #twitter-card--hidden {
 	.hidee {
 		float: none;
 		width: 100%;
+	}
+	#big-logo {
+		font-size: 22px;
+		height: 256px;
+		background-size: contain;
 	}
 }
 @media screen and (max-width: 320px) {
