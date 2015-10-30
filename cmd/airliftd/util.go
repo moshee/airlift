@@ -24,6 +24,10 @@ func (c *context) Version() string {
 	return VERSION
 }
 
+func (c *context) Config() *config.Config {
+	return config.Get()
+}
+
 // header password
 func checkPassword(g *gas.Gas) (int, gas.Outputter) {
 	conf := config.Get()
@@ -56,18 +60,23 @@ func redirectTLS(g *gas.Gas) (int, gas.Outputter) {
 	return g.Continue()
 }
 
-// login cookie
 func checkLogin(g *gas.Gas) (int, gas.Outputter) {
-	conf := config.Get()
-
-	// if there's a password set, only allow user into config if they're logged
-	// in, otherwise it's probably the first run and they need to enter one
-	if conf.Password != nil {
-		if sess, _ := auth.GetSession(g); sess == nil {
-			return 303, out.Reroute("/-/login", g.URL.Path)
-		}
+	if !isLoggedIn(g) {
+		return 303, out.Reroute("/-/login", g.URL.Path)
 	}
 	return g.Continue()
+}
+
+func isLoggedIn(g *gas.Gas) bool {
+	conf := config.Get()
+
+	if conf.Password != nil {
+		if sess, _ := auth.GetSession(g); sess == nil {
+			return false
+		}
+	}
+
+	return true
 }
 
 // return to the URL that sent the reroute

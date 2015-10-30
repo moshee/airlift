@@ -197,7 +197,7 @@ func main() {
 		Get("/{id}/{filename}", getFile).
 		Get("/{id}.{ext}", getFile).
 		Get("/{id}", getFile).
-		Get("/", checkLogin, getIndex).
+		Get("/", getIndex).
 		Ignition()
 }
 
@@ -572,5 +572,8 @@ func getAgeLimitPrune(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func getIndex(g *gas.Gas) (int, gas.Outputter) {
-	return 200, out.HTML("index", &context{nil}, "common")
+	if isLoggedIn(g) {
+		return 200, out.HTML("index", &context{}, "common")
+	}
+	return 200, out.HTML("default-index", &context{})
 }

@@ -485,6 +485,23 @@ input#twitter-card:checked ~ #twitter-card--hidden {
 	visibility: visible;
 }
 
+#front {
+	text-align: center;
+	margin-bottom: 64px;
+}
+#big-logo {
+	line-height: 512px;
+	height: 512px;
+	color: #aaa;
+	font-size: 32px;
+	font-weight: 300;
+	background: url('/-/static/airlift.svg') center no-repeat;
+}
+
+.login-link a {
+	color: #ddd;
+}
+
 #version {
 	font-size: 12px;
 	color: #888;

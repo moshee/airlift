@@ -11,3 +11,21 @@
   </section>
   <script>window.addEventListener('load', setupUploader, false);</script>
 {{ end }}
+
+{{ define "default-index" }}
+<!doctype html>
+<html>
+  <head>
+    <title>Airlift</title>
+    {{ template "head" }}
+  </head>
+  <body>
+    <section id="front">
+      <div id="big-logo">
+        {{ $.Config.Host }} is powered by <a href="https://github.com/moshee/airlift">Airlift</a>.
+      </div>
+      <div class="login-link"><a href="/-/login">Log in</a></div>
+    </section>
+  </body>
+</html>
+{{ end }}
