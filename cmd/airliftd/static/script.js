@@ -112,8 +112,7 @@ function setURLList(urls) {
 	for (var i = 0, url, li, a; url = urls[i]; i++) {
 		li = document.createElement('li');
 		a = document.createElement('a');
-		a.href = url;
-		a.innerText = url;
+		a.href = a.innerText = a.textContent = url;
 		li.appendChild(a);
 		ul.appendChild(li);
 	}
