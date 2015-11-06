@@ -120,9 +120,12 @@ function setURLList(urls) {
 }
 
 function dropZoneEnter(e) {
-	e.preventDefault();
-	e.stopPropagation();
-	dropZone.classList.add('active');
+	var dt = e.dataTransfer;
+	if (dt != null && Array.prototype.indexOf.call(dt.types, 'Files') >= 0) {
+		e.preventDefault();
+		e.stopPropagation();
+		dropZone.classList.add('active');
+	}
 }
 
 function dropZoneLeave(e) {
@@ -139,6 +142,7 @@ function dropped(e) {
 
 function uploadFiles(fileList) {
 	if (fileList == null || fileList.length == 0) {
+		finish();
 		return;
 	}
 
