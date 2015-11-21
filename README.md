@@ -1,8 +1,10 @@
-# Airlift
+# Airlift :package:
 
 Airlift is a self-hosted file upload and sharing service. The clients upload
 files to the server and return a nice link for you to share. Just bring your
 own server and domain.
+
+:bomb: This is unstable software. It is not feature-complete and has lots of bugs.
 
 You should use [deuiore/load.link](https://github.com/deuiore/load.link)
 instead of this if...
