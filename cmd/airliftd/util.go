@@ -61,22 +61,33 @@ func redirectTLS(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func checkLogin(g *gas.Gas) (int, gas.Outputter) {
-	if !isLoggedIn(g) {
+	sess, ok := isLoggedIn(g)
+	if !ok {
+		if g.Request.Method == "POST" {
+			return 403, nil
+		}
 		return 303, out.Reroute("/-/login", g.URL.Path)
 	}
+
+	if sess != nil {
+		sessions.Update(sess.Id)
+	}
+
 	return g.Continue()
 }
 
-func isLoggedIn(g *gas.Gas) bool {
+func isLoggedIn(g *gas.Gas) (*auth.Session, bool) {
 	conf := config.Get()
 
 	if conf.Password != nil {
 		if sess, _ := auth.GetSession(g); sess == nil {
-			return false
+			return nil, false
+		} else {
+			return sess, true
 		}
 	}
 
-	return true
+	return nil, true
 }
 
 // return to the URL that sent the reroute

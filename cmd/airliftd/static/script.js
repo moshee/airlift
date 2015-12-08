@@ -214,13 +214,19 @@ function uploadFiles(fileList) {
 
 			x.addEventListener('load', function(e) {
 				try {
-					if (this.status !== 201) {
-						var err = JSON.parse(this.responseText);
-						showMessage(err.Err, 'bad');
-					} else {
+					switch (this.status) {
+					case 201:
 						var resp = JSON.parse(this.responseText);
 						result.push(window.location.protocol + '//' + resp.URL);
 						setTimeout(next, 1, i+1, result, totalLoaded);
+						break;
+					case 403:
+						window.location = '/-/login';
+						break;
+					default:
+						var err = JSON.parse(this.responseText);
+						showMessage(err.Err, 'bad');
+						break;
 					}
 				} catch (e) {
 					showMessage('Server Error: ' + this.statusText, 'bad');

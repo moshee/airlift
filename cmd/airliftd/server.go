@@ -39,6 +39,7 @@ var (
 	appDir     string // the place where all the stuff is stored
 	fileCache  *cache.Cache
 	thumbCache *thumb.Cache
+	sessions   *auth.FileStore
 
 	VERSION = "devel"
 )
@@ -126,11 +127,11 @@ func main() {
 
 	sessDir := filepath.Join(appDir, "sessions")
 	os.RemoveAll(sessDir)
-	store := &auth.FileStore{Root: sessDir}
+	sessions = &auth.FileStore{Root: sessDir}
 
-	gas.AddDestructor(store.Destroy)
+	gas.AddDestructor(sessions.Destroy)
 
-	auth.UseSessionStore(store)
+	auth.UseSessionStore(sessions)
 
 	conf := config.Get()
 	fileCache, err = cache.New(conf.Directory)
@@ -572,7 +573,7 @@ func getAgeLimitPrune(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func getIndex(g *gas.Gas) (int, gas.Outputter) {
-	if isLoggedIn(g) {
+	if _, ok := isLoggedIn(g); ok {
 		return 200, out.HTML("index", &context{}, "common")
 	}
 	return 200, out.HTML("default-index", &context{})
