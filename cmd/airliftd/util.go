@@ -97,7 +97,7 @@ func reroute(g *gas.Gas) (int, gas.Outputter) {
 	err := out.Recover(g, &path)
 	if err != nil {
 		log.Print("reroute error: ", err)
-		path = "/-/config"
+		path = "/"
 	}
 	return 302, out.Redirect(path)
 }
