@@ -13,7 +13,14 @@ import (
 // alternate filename. It probably has proper formatting and non-ASCII
 // character support, as described by RFC 2616 and RFC 5987.
 func SetFilename(w http.ResponseWriter, filename string) {
-	encoded := (&url.URL{Path: filename}).String()
+	// For some reason Go doesn't provide access to the internal percent
+	// encoding routines, meaning we have to do this to get a fully
+	// percent-encoded string including spaces as %20.
+	// Chrome interprets an unescaped comma in the UTF-8 filename as a header
+	// value separator and simply refuses to render the contents, so it all
+	// needs to be percent encoded.
+	encoded := url.QueryEscape(filename)
+	encoded = strings.Replace(encoded, "+", "%20", -1)
 	// RFC2616 §2.2 - syntax of quoted strings
 	escaped := strings.Replace(filename, `\`, `\\`, -1)
 	escaped = strings.Replace(escaped, `"`, `\"`, -1)
