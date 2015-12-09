@@ -1,8 +1,10 @@
 {{ define "config" }}
+  {{ template "%overview" . }}
+  {{ template "%config" . }}
+{{ end }}
+
+{{ define "%config" }}
 {{ with .Data }}
-  <section id="section-overview" class="floating-section">
-    {{ template "overview" . }}
-  </section>
   <section id="section-config" class="floating-section">
     <h1>Configuration</h1>
     <form id="config">
@@ -65,8 +67,12 @@
 {{ end }}
 {{ end }}
 
-{{ define "overview" }}
+{{ define "%overview" }}
+{{ with .Data }}
+  <section id="section-overview" class="floating-section">
     <h1>Overview</h1>
     <p><strong><a href="/-/history/0">{{ .NumUploads }} upload{{ if ne .NumUploads 1 }}s{{ end }}</a></strong> totalling <strong>{{ .UploadsSize }}</strong>. (<a href="javascript:purgeAll()">purge</a>)</p>
     <p>Thumbnail cache is <strong>{{ .ThumbsSize }}</strong>. (<a href="javascript:purgeThumbs()">purge</a>)</p>
+  </section>
+{{ end }}
 {{ end }}

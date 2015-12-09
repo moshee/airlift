@@ -214,7 +214,6 @@ func getConfig(g *gas.Gas) (int, gas.Outputter) {
 		fmtutil.Bytes(fileCache.Size()),
 		fmtutil.Bytes(thumbCache.Size()),
 	}
-
 	return 200, out.HTML("config", &context{data}, "common")
 }
 
@@ -229,7 +228,7 @@ func getConfigOverview(g *gas.Gas) (int, gas.Outputter) {
 		fmtutil.Bytes(thumbCache.Size()),
 	}
 
-	return 200, out.HTML("overview", data)
+	return 200, out.HTML("%overview", &context{data})
 }
 
 func postConfig(g *gas.Gas) (int, gas.Outputter) {
@@ -273,8 +272,17 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 		newconf.HashLen = 64
 	}
 
+	newconf.Directory = filepath.Clean(newconf.Directory)
+
 	if newconf.TwitterCardEnable && newconf.TwitterHandle == "" {
 		return 400, out.JSON(&Resp{Err: "you must provide a Twitter handle to use Twitter Cards"})
+	}
+
+	if newconf.TwitterHandle != "" {
+		newconf.TwitterHandle = strings.TrimSpace(newconf.TwitterHandle)
+		if !strings.HasPrefix(newconf.TwitterHandle, "@") {
+			newconf.TwitterHandle = "@" + newconf.TwitterHandle
+		}
 	}
 
 	if err := config.Set(&newconf); err != nil {
@@ -412,6 +420,7 @@ func postFile(g *gas.Gas) (int, gas.Outputter) {
 	}
 	return 201, out.JSON(&Resp{URL: path.Join(host, hash)})
 }
+
 func deleteFile(g *gas.Gas) (int, gas.Outputter) {
 	id := g.Arg("id")
 	if id == "" {

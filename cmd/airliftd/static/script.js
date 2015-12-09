@@ -1,6 +1,125 @@
-function $(sel) { return document.querySelector(sel); }
-function $$(sel) { return document.querySelectorAll(sel); }
-var timeout;
+/*** Common ***/
+
+var messageTimeout;
+
+function $(sel, root) {
+	return (root || document).querySelector(sel);
+}
+
+function $$(sel, root) {
+	return (root || document).querySelectorAll(sel);
+}
+
+Node.prototype.sacrificeChildren = function() {
+	while (this.hasChildNodes()) this.removeChild(this.firstChild);
+};
+
+function chain(f) {
+    return {
+        i: 0,
+        funcs: f != null ? [f] : [],
+        err: null,
+        catcher: null,
+        then: function(g) {
+            this.funcs = this.funcs || [];
+            this.funcs.push(g);
+            return this;
+        },
+        pass: function() {
+            if (this.i < this.funcs.length) {
+                var args = [this.pass.bind(this), this.fail.bind(this)];
+                if (arguments != null) {
+                    args = args.concat(Array.prototype.slice.call(arguments));
+                }
+                this.funcs[this.i++].apply(this, args);
+            }
+            return this;
+        },
+        fail: function(err) {
+            if (this.catcher != null) {
+                this.catcher(err);
+            }
+            return this;
+        },
+        catch: function(g) {
+            this.catcher = g;
+            return this;
+        }
+    };
+}
+
+function makesvg(elem) {
+	return document.createElementNS("http://www.w3.org/2000/svg", elem);
+}
+
+function showMessage(msg, classname) {
+	if (messageTimeout != null) {
+		window.clearTimeout(messageTimeout);
+	}
+
+	var box = $('#message-box');
+	box.innerText = msg;
+	box.classList.add(classname);
+	box.classList.add('active')
+	messageTimeout = window.setTimeout(hideMessage, 5000);
+}
+
+function hideMessage() {
+	$('#message-box').classList.remove('active');
+}
+
+function errorMessage(resp) {
+	var err = resp.Err || resp;
+	if (err != null) {
+		showMessage('Error: ' + err, 'bad');
+	} else {
+		console.error('errorMessage: malformed error object');
+		console.log(resp);
+		showMessage('An unknown error occurred (status ' + code + ')', 'bad');
+	}
+}
+
+// method string
+// url    string
+// data   Object - post form data or null
+// async  Boolean
+// cb     function(code int, resp Object) - callback
+// mutate function(x XMLHttpRequest, afteropen Boolean) [opt] -
+//  callback to mutate xhr before request
+function json(method, url, data, async, cb, mutate) {
+	var x = new XMLHttpRequest();
+	var h = function(x) {
+		var resp = {};
+		if (x.response != '') {
+			try {
+				resp = JSON.parse(x.response);
+			} catch (err) {
+				console.error(err);
+				showMessage('Something\'s wrong with the server (status ' + code + ')', 'bad');
+				return false;
+			}
+		}
+		return cb(x.status, resp);
+	};
+	if (async) {
+		x.addEventListener('load', function(e) { h(e.target); }, false);
+	}
+	if (mutate != null) {
+		mutate(x, false);
+	}
+	x.open(method, url, async);
+	if (mutate != null) {
+		mutate(x, true);
+	}
+	x.send(data);
+	if (!async) {
+		return h(x);
+	}
+}
+
+/*** Uploader ***/
+
+var dropZone, dropZoneText, picker, urlList, bar;
 
 function setupUploader() {
 	dropZone = $('#drop-zone');
@@ -50,61 +169,6 @@ function paste(e) {
 
 	next();
 }
-
-Node.prototype.sacrificeChildren = function() {
-	while (this.hasChildNodes()) this.removeChild(this.firstChild);
-};
-
-function makesvg(elem) {
-	return document.createElementNS("http://www.w3.org/2000/svg", elem);
-}
-
-function showMessage(msg, classname) {
-	if (timeout != null) window.clearTimeout(timeout);
-
-	var box = $('#message-box');
-	box.innerText = msg;
-	box.classList.add(classname);
-	box.classList.add('active')
-	timeout = window.setTimeout(hideMessage, 5000);
-}
-
-function hideMessage() {
-	$('#message-box').classList.remove('active');
-}
-
-function cb(e) {
-	if (e.target.status == 204) {
-		document.location.reload(true);
-	} else {
-		var resp = JSON.parse(e.target.responseText);
-		if (resp != null && resp.Err != null) {
-			showMessage('Error: ' + resp.Err, 'bad');
-		} else {
-			showMessage('An unknown error occurred (status ' + e.target.status + ')', 'bad');
-		}
-	}
-}
-
-function purgeAll() {
-	if (!window.confirm('Really delete all of your uploads?')) {
-		return;
-	}
-
-	var x = new XMLHttpRequest();
-	x.addEventListener('load', cb, false);
-	x.open('POST', '/purge/all');
-	x.send();
-}
-
-function purgeThumbs() {
-	var x = new XMLHttpRequest();
-	x.addEventListener('load', cb, false);
-	x.open('POST', '/purge/thumbs');
-	x.send();
-}
-
-var dropZone, dropZoneText, picker, urlList, bar;
 
 function setURLList(urls) {
 	var ul = urlList.querySelector('ul');
@@ -196,59 +260,54 @@ function uploadFiles(fileList) {
 	dropZoneText.dataset.oldText = dropZoneText.innerText;
 	dropZoneText.innerText = 'Cancel';
 
-	var next = function(i, result, totalLoaded) {
-		if (i < fileList.length) {
-			var file = fileList[i];
-			x = new XMLHttpRequest();
+	var c = chain();
 
-			x.upload.addEventListener('progress', function(e) {
-				if (e.lengthComputable) {
-					bar.style.width = ((totalLoaded + e.loaded)*100 / totalSize) + '%';
-				}
-			}, false);
-
-			x.upload.addEventListener('load', function() {
-				totalLoaded += file.size;
-				bar.style.width = totalLoaded*100 / totalSize + '%';
-			}, false);
-
-			x.addEventListener('load', function(e) {
-				try {
-					switch (this.status) {
+	for (var i = 0; i < fileList.length; i++) {
+		(function(file) {
+			c.then(function(pass, fail, result) {
+				json('POST', '/upload/web', file, true, function(code, resp) {
+					switch (code) {
 					case 201:
-						var resp = JSON.parse(this.responseText);
 						result.push(window.location.protocol + '//' + resp.URL);
 						setTimeout(next, 1, i+1, result, totalLoaded);
+						pass(result);
 						break;
 					case 403:
 						window.location = '/-/login';
 						break;
 					default:
-						var err = JSON.parse(this.responseText);
-						showMessage(err.Err, 'bad');
+						fail(resp);
 						break;
 					}
-				} catch (e) {
-					showMessage('Server Error: ' + this.statusText, 'bad');
-					console.error('error parsing response: ' + e);
-				}
-			}, false);
+				}, function(x, afteropen) {
+					if (!afteropen) {
+						x.upload.addEventListener('progress', function(e) {
+							if (e.lengthComputable) {
+								bar.style.width = ((totalLoaded + e.loaded)*100 / totalSize) + '%';
+							}
+						}, false);
 
-			x.open('POST', '/upload/web', true);
-			x.setRequestHeader('X-Airlift-Filename', encodeURIComponent(file.name));
-			x.send(file);
-		} else {
-			finish();
-			setURLList(result);
-			dropZone.removeEventListener('click', cancel);
-			dropZone.addEventListener('click', clickPicker);
-			if (svg != null) {
-				svg.sacrificeChildren();
-			}
+						x.upload.addEventListener('load', function() {
+							totalLoaded += file.size;
+							bar.style.width = totalLoaded*100 / totalSize + '%';
+						}, false);
+					} else {
+						x.setRequestHeader('X-Airlift-Filename', encodeURIComponent(file.name));
+					}
+				});
+			});
+		})(fileList[i]);
+	}
+
+	c.then(function(pass, fail, result) {
+		finish();
+		setURLList(result);
+		dropZone.removeEventListener('click', cancel);
+		dropZone.addEventListener('click', clickPicker);
+		if (svg != null) {
+			svg.sacrificeChildren();
 		}
-	};
-
-	next(0, [], 0);
+	}).catch(errorMessage).pass([]);
 }
 
 function finish() {
@@ -277,17 +336,29 @@ function clickPicker() {
 	picker.click();
 }
 
+/*** Config ***/
+
 var oldMaxSize, oldMaxAge, sampleID, sampleExt, idSize, addExt;
 
-function reloadOverview() {
+function reloadSection(endpoint, target) {
 	var x = new XMLHttpRequest();
-	x.open('GET', '/-/config/overview', true);
 	x.addEventListener('load', function(e) {
-		if (e.target.status === 200) {
-			$('#section-overview').innerHTML = e.target.response;
-		}
-	});
+		var section    = $(target);
+		var newSection = $(target, e.target.response);
+		section.parentNode.replaceChild(newSection, section);
+	}, false);
+	x.open('GET',endpoint, true);
+	x.responseType = 'document';
+	x.setRequestHeader('X-Ajax-Partial', 1);
 	x.send();
+}
+
+function reloadConfigValues() {
+	reloadSection('/-/config', '#section-config');
+}
+
+function reloadOverview() {
+	reloadSection('/-/config/overview', '#section-overview');
 }
 
 function updateSample() {
@@ -302,6 +373,28 @@ function updateSample() {
 	} else {
 		sampleExt.classList.remove('show');
 	}
+}
+
+function purgeDone(code, resp) {
+	if (code == 204) {
+		reloadOverview();
+	} else {
+		errorMessage(resp);
+	}
+}
+
+function purgeAll() {
+	var str = 'Really delete all of your uploads?\n\n' +
+		'Once they\'re gone, the\'re really gone.';
+	if (!window.confirm(str)) {
+		return;
+	}
+
+	json('POST', '/purge/all', null, true, purgeDone);
+}
+
+function purgeThumbs() {
+	json('POST', '/purge/thumbs', null, true, purgeDone);
 }
 
 function configPage() {
@@ -328,72 +421,78 @@ function configPage() {
 		var hider = b.querySelector('.hider');
 		hider.hidee = b.querySelector('.hidee input');
 		hider.addEventListener('click', function() {
-			this.hidee.disabled = !this.checked;
+			if (this.checked) {
+				this.hidee.removeAttribute('disabled');
+			} else {
+				this.hidee.setAttribute('disabled', 'disabled');
+			}
 		}, false);
 	}
 
 	$('#submit').addEventListener('click', function() {
-		for (var i = 0, button; button = buttons[i]; i++) button.setAttribute('disabled', true);
+		for (var i = 0, button; button = buttons[i]; i++) {
+			button.setAttribute('disabled', true);
+		}
 		var maxSize = parseInt($('#max-size').value);
 		var maxAge  = parseInt($('#max-age').value);
 		var delta   = 0;
-
-		var f = function(url, val) {
+		var f = function(url, val, pass, fail) {
 			var fd = new FormData();
 			fd.append('N', val);
-			var x = new XMLHttpRequest();
-			x.open('POST', url, false);
-			x.send(fd);
 
-			if (x.status == 200) {
-				var n = JSON.parse(x.response).N;
-				if (n > delta) delta = n;
-				return true;
-			} else {
-				var err = JSON.parse(x.response);
-				showMessage('Server error: ' + err.Err + ' (' + x.status + ')', 'bad');
-				return false;
-			}
-		}
-
-		if (maxSize > 0 && (oldMaxSize == 0 || maxSize < oldMaxSize)) {
-			if (!f('/-/config/size', maxSize)) return;
-		}
-		if (maxAge > 0 && (oldMaxAge == 0 || maxAge < oldMaxAge)) {
-			if (!f('/-/config/age', maxAge)) return;
-		}
-		if (delta > 0) {
-			if (!confirm('Changes made to age or size limits mean that ' + delta + ' old file(s) will be pruned. Continue?')) {
-				return;
-			}
-		}
-
-		oldMaxAge = maxAge;
-		oldMaxSize = maxSize;
-
-		var host   = $('#host');
-		host.value = host.value.replace(/\w+:\/\//, '');
-			var fd     = new FormData($('#config'));
-		var x      = new XMLHttpRequest();
-
-		x.addEventListener('load', function(e) {
-			$('#password').value = '';
-			for (var i = 0, button; button = buttons[i]; i++) button.removeAttribute('disabled');
-			if (e.target.status === 204) {
-				showMessage('Configuration updated.', 'good');
-				$('#newpass').value = '';
-				reloadOverview();
-			} else {
-				var resp = JSON.parse(x.responseText);
-				if (resp != null && resp.Err != null) {
-					showMessage('Error: ' + resp.Err, 'bad');
+			json('POST', url, fd, true, function(code, resp) {
+				if (code === 200) {
+					if (resp.N > delta) delta = resp.N;
+					pass();
 				} else {
-					showMessage('An unknown error occurred (status ' + e.target.status + ')', 'bad');
+					fail(resp);
+				}
+			});
+		};
+
+		chain(function(pass, fail) {
+			if (maxSize > 0 && (oldMaxSize == 0 || maxSize < oldMaxSize)) {
+				f('/-/config/size', maxSize, pass, fail);
+			} else {
+				pass();
+			}
+		}).then(function(pass, fail) {
+			if (maxAge > 0 && (oldMaxAge == 0 || maxAge < oldMaxAge)) {
+				f('/-/config/age', maxAge, pass, fail);
+			} else {
+				pass();
+			}
+		}).then(function(pass, fail) {
+			if (delta > 0) {
+				if (!confirm('Changes made to age or size limits mean that ' + delta + ' old file(s) will be pruned. Continue?')) {
+					return;
 				}
 			}
-		}, false);
 
-		x.open('POST', '/-/config', true);
-		x.send(fd);
+			oldMaxAge  = maxAge;
+			oldMaxSize = maxSize;
+
+			var host   = $('#host');
+			host.value = host.value.replace(/\w+:\/\//, '');
+			var fd     = new FormData($('#config'));
+
+			json('POST', '/-/config', fd, true, function(code, resp) {
+				$('#password').value = '';
+
+				for (var i = 0, button; button = buttons[i]; i++) {
+					button.removeAttribute('disabled');
+				}
+
+				if (code === 204) {
+					$('#newpass').value = '';
+					reloadConfigValues();
+					reloadOverview();
+					showMessage('Configuration updated.', 'good');
+					pass();
+				} else {
+					fail(resp);
+				}
+			});
+		}).catch(errorMessage).pass();
 	}, false);
 }
