@@ -1,4 +1,10 @@
 {{ define "history" }}
+{{ template "%history" . }}
+<script src="/-/static/common.js"></script>
+<script src="/-/static/history.js"></script>
+{{ end }}
+
+{{ define "%history" }}
 {{ with .Data }}
 <section id="history">
   {{ if len .List | lt 25 }}{{ template "pagination" . }}{{ end }}
@@ -14,8 +20,6 @@
   </ul>
   {{ template "pagination" . }}
 </section>
-<script src="/-/static/common.js"></script>
-<script src="/-/static/history.js"></script>
 {{ end }}
 {{ end }}
 

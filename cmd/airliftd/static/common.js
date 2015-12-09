@@ -114,3 +114,19 @@ function json(method, url, data, async, cb, mutate) {
 		return h(x);
 	}
 }
+
+function reloadSection(endpoint, target, cb) {
+	var x = new XMLHttpRequest();
+	x.addEventListener('load', function(e) {
+		var section    = $(target);
+		var newSection = $(target, e.target.response);
+		section.parentNode.replaceChild(newSection, section);
+		if (cb != null) {
+			cb();
+		}
+	}, false);
+	x.open('GET', endpoint, true);
+	x.responseType = 'document';
+	x.setRequestHeader('X-Ajax-Partial', 1);
+	x.send();
+}

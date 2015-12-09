@@ -7,7 +7,7 @@
 {{ with .Data }}
   <section id="section-config" class="floating-section">
     <h1>Configuration</h1>
-    <form id="config">
+    <form id="config" autocomplete="off">
       <div class="box" id="host-box" data-tooltip="Returned file links will begin with this domain and path." data-tt-pos="top">
         <label for="host">Base URL</label>
         <input type="text" id="host" name="host" value="{{ .Conf.Host }}" placeholder="i.example.com">
@@ -72,8 +72,8 @@
 {{ with .Data }}
   <section id="section-overview" class="floating-section">
     <h1>Overview</h1>
-    <p><strong><a href="/-/history/0">{{ .NumUploads }} upload{{ if ne .NumUploads 1 }}s{{ end }}</a></strong> totalling <strong>{{ .UploadsSize }}</strong>. (<a href="javascript:purgeAll()">purge</a>)</p>
-    <p>Thumbnail cache is <strong>{{ .ThumbsSize }}</strong>. (<a href="javascript:purgeThumbs()">purge</a>)</p>
+    <p><strong><a href="/-/history/0">{{ .NumUploads }} upload{{ if ne .NumUploads 1 }}s{{ end }}</a></strong> totalling <strong>{{ .UploadsSize }}</strong>. (<a id="purge-all-link" href="javascript:void(0)">purge</a>)</p>
+    <p>Thumbnail cache is <strong>{{ .ThumbsSize }}</strong>. (<a id="purge-thumbs-link" href="javascript:void(0)">purge</a>)</p>
   </section>
 {{ end }}
 {{ end }}

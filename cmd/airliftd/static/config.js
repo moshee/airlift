@@ -3,25 +3,12 @@
 
 	var oldMaxSize, oldMaxAge, sampleID, sampleExt, idSize, addExt;
 
-	function reloadSection(endpoint, target) {
-		var x = new XMLHttpRequest();
-		x.addEventListener('load', function(e) {
-			var section    = $(target);
-			var newSection = $(target, e.target.response);
-			section.parentNode.replaceChild(newSection, section);
-		}, false);
-		x.open('GET',endpoint, true);
-		x.responseType = 'document';
-		x.setRequestHeader('X-Ajax-Partial', 1);
-		x.send();
-	}
-
 	function reloadConfigValues() {
-		reloadSection('/-/config', '#section-config');
+		reloadSection('/-/config', '#section-config', setupConfig);
 	}
 
 	function reloadOverview() {
-		reloadSection('/-/config/overview', '#section-overview');
+		reloadSection('/-/config/overview', '#section-overview', setupOverview);
 	}
 
 	function updateSample() {
@@ -60,7 +47,12 @@
 		json('POST', '/purge/thumbs', null, true, purgeDone);
 	}
 
-	window.addEventListener('DOMContentLoaded', function() {
+	function setupOverview() {
+		$('#purge-all-link').addEventListener('click', purgeAll, false);
+		$('#purge-thumbs-link').addEventListener('click', purgeThumbs, false);
+	}
+
+	function setupConfig() {
 		var buttons = $$('button'), host = $('#host');
 		oldMaxSize  = parseInt($('#max-size').value);
 		oldMaxAge   = parseInt($('#max-age').value);
@@ -158,5 +150,8 @@
 				});
 			}).catch(errorMessage).pass();
 		}, false);
-	}, false);
+	}
+
+	window.addEventListener('DOMContentLoaded', setupOverview, false);
+	window.addEventListener('DOMContentLoaded', setupConfig, false);
 })();

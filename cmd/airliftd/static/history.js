@@ -11,8 +11,7 @@
 				if (code == 204) {
 					item.style.opacity = '0.0';
 					item.addEventListener('transitionend', function(e) {
-						e.target.parentNode.removeChild(e.target);
-						window.location.reload(true);
+						reloadSection(window.location.pathname, '#history', setupHistory);
 					}, false);
 				} else {
 					item.style.opacity = '';
@@ -22,8 +21,10 @@
 		}, false);
 	}
 
-	window.addEventListener('DOMContentLoaded', function() {
+	function setupHistory() {
 		var items = $$('.history-item');
 		Array.prototype.forEach.call(items, bindHistoryItem);
-	}, true);
+	}
+
+	window.addEventListener('DOMContentLoaded', setupHistory, true);
 })();
