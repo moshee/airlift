@@ -54,6 +54,8 @@ const (
 	// 150px in height. Image must be less than 1MB in size."
 	twitterThumbWidth  = 280
 	twitterThumbHeight = 150
+
+	appDirName = ".airliftd"
 )
 
 type Resp struct {
@@ -81,7 +83,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	appDir = filepath.Join(u.HomeDir, ".airlift-server")
+	appDir = filepath.Join(u.HomeDir, appDirName)
 	if err := os.MkdirAll(appDir, os.FileMode(0700)); err != nil {
 		log.Fatal(err)
 	}
@@ -125,12 +127,10 @@ func main() {
 		out.TemplateFS(bindata.Root)
 	}
 
-	sessDir := filepath.Join(appDir, "sessions")
+	sessDir := filepath.Join(os.TempDir(), "airliftd-sessions")
 	os.RemoveAll(sessDir)
 	sessions = &auth.FileStore{Root: sessDir}
-
 	gas.AddDestructor(sessions.Destroy)
-
 	auth.UseSessionStore(sessions)
 
 	conf := config.Get()
