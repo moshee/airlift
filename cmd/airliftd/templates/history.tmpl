@@ -14,40 +14,8 @@
   </ul>
   {{ template "pagination" . }}
 </section>
-<script>
-  window.addEventListener('DOMContentLoaded', function() {
-    var items = $$('.history-item');
-    for (var i = 0, item; item = items[i]; i++) {
-      (function(item) {
-        item.querySelector('a.delete-upload').addEventListener('click', function() {
-          item.style.opacity = '0.5';
-          var x = new XMLHttpRequest();
-
-          x.addEventListener('load', function(e) {
-            if (e.target.status == 204) {
-              item.style.opacity = '0.0';
-              item.addEventListener('transitionend', function(e) {
-                e.target.parentNode.removeChild(e.target);
-                window.location.reload(true);
-              }, false);
-            } else {
-              item.style.opacity = '';
-              var resp = JSON.parse(x.responseText);
-              if (resp != null && resp.Err != null) {
-                alert('error: ' + resp.Err);
-              } else {
-                alert('wat');
-              }
-            }
-          });
-
-          x.open('POST', '/delete/' + item.dataset.id, true);
-          x.send();
-        }, false);
-      })(item);
-    }
-  }, true);
-</script>
+<script src="/-/static/common.js"></script>
+<script src="/-/static/history.js"></script>
 {{ end }}
 {{ end }}
 

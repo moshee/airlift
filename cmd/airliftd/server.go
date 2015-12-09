@@ -194,7 +194,7 @@ func main() {
 		Get("/-/thumb/{id}.jpg", checkLogin, getThumb).
 		Get("/-/twitterthumb/{id}.jpg", getTwitterThumb).
 		Delete("/{id}", checkPassword, deleteFile).
-		Post("/delete/{id}", checkLogin, deleteFile).
+		Post("/-/delete/{id}", checkLogin, deleteFile).
 		Get("/{id}/{filename}", getFile).
 		Get("/{id}.{ext}", getFile).
 		Get("/{id}", getFile).
