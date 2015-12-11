@@ -80,11 +80,10 @@ function errorMessage(resp) {
 // method string
 // url    string
 // data   Object - post form data or null
-// async  Boolean
 // cb     function(code int, resp Object) - callback
 // mutate function(x XMLHttpRequest, afteropen Boolean) [opt] -
 //  callback to mutate xhr before request
-function json(method, url, data, async, cb, mutate) {
+function json(method, url, data, cb, mutate) {
 	var x = new XMLHttpRequest();
 	var h = function(x) {
 		var resp = {};
@@ -100,24 +99,19 @@ function json(method, url, data, async, cb, mutate) {
 		return cb(x.status, resp);
 	};
 
-	if (async) {
-		x.addEventListener('load', function(e) { h(e.target); }, false);
-	}
+	x.addEventListener('load', function(e) { h(e.target); }, false);
+
 	if (mutate != null) {
 		mutate(x, false);
 	}
 
-	x.open(method, url, async);
+	x.open(method, url, true);
 
 	if (mutate != null) {
 		mutate(x, true);
 	}
 
 	x.send(data);
-
-	if (!async) {
-		return h(x);
-	}
 }
 
 function reloadSection(endpoint, target, cb) {

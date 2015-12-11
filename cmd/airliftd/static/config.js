@@ -40,11 +40,11 @@
 			return;
 		}
 
-		json('POST', '/purge/all', null, true, purgeDone);
+		json('POST', '/purge/all', null, purgeDone);
 	}
 
 	function purgeThumbs() {
-		json('POST', '/purge/thumbs', null, true, purgeDone);
+		json('POST', '/purge/thumbs', null, purgeDone);
 	}
 
 	function setupOverview() {
@@ -95,7 +95,7 @@
 				var fd = new FormData();
 				fd.append('N', val);
 
-				json('POST', url, fd, true, function(code, resp) {
+				json('POST', url, fd, function(code, resp) {
 					if (code === 200) {
 						if (resp.N > delta) delta = resp.N;
 						pass();
@@ -131,7 +131,7 @@
 				host.value = host.value.replace(/\w+:\/\//, '');
 				var fd     = new FormData($('#config'));
 
-				json('POST', '/-/config', fd, true, function(code, resp) {
+				json('POST', '/-/config', fd, function(code, resp) {
 					$('#password').value = '';
 
 					for (var i = 0, button; button = buttons[i]; i++) {

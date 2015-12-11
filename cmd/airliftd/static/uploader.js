@@ -128,7 +128,7 @@
 		for (var i = 0; i < fileList.length; i++) {
 			(function(file) {
 				c.then(function(pass, fail, result, totalLoaded) {
-					json('POST', '/upload/web', file, true, function(code, resp) {
+					json('POST', '/upload/web', file, function(code, resp) {
 						switch (code) {
 						case 201:
 							result.push(window.location.protocol + '//' + resp.URL);

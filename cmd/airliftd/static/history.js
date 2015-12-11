@@ -7,7 +7,7 @@
 			item.style.opacity = '0.5';
 			var path = '/-/delete/' + item.dataset.id;
 
-			json('POST', path, null, true, function(code, resp) {
+			json('POST', path, null, function(code, resp) {
 				switch (code) {
 				case 204:
 					item.style.opacity = '0.0';
