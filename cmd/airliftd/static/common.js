@@ -99,17 +99,22 @@ function json(method, url, data, async, cb, mutate) {
 		}
 		return cb(x.status, resp);
 	};
+
 	if (async) {
 		x.addEventListener('load', function(e) { h(e.target); }, false);
 	}
 	if (mutate != null) {
 		mutate(x, false);
 	}
+
 	x.open(method, url, async);
+
 	if (mutate != null) {
 		mutate(x, true);
 	}
+
 	x.send(data);
+
 	if (!async) {
 		return h(x);
 	}
@@ -129,4 +134,9 @@ function reloadSection(endpoint, target, cb) {
 	x.responseType = 'document';
 	x.setRequestHeader('X-Ajax-Partial', 1);
 	x.send();
+}
+
+function redirectLogin(returnPath) {
+	returnPath = returnPath || window.location.pathname;
+	window.location = '/-/login?return=' + encodeURIComponent(returnPath);
 }

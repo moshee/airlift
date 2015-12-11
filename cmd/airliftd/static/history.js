@@ -8,14 +8,20 @@
 			var path = '/-/delete/' + item.dataset.id;
 
 			json('POST', path, null, true, function(code, resp) {
-				if (code == 204) {
+				switch (code) {
+				case 204:
 					item.style.opacity = '0.0';
 					item.addEventListener('transitionend', function(e) {
 						reloadSection(window.location.pathname, '#history', setupHistory);
 					}, false);
-				} else {
+					break;
+				case 403:
+					redirectLogin();
+					break;
+				default:
 					item.style.opacity = '';
 					errorMessage(resp);
+					break;
 				}
 			});
 		}, false);

@@ -4,36 +4,36 @@
 	var dropZone, dropZoneText, picker, urlList, bar;
 
 	function paste(e) {
-		var items = [];
-		var i     = 0;
 		var item;
+		var c = chain();
 
-		var next = function() {
-			item = e.clipboardData.items[i++];
-			if (item == null) {
-				uploadFiles(items);
-				return;
-			}
+		for (var i = 0; i < e.clipboardData.items.length; i++) {
+			(function(item) {
+				c.then(function(pass, fail, items) {
+					switch (item.kind) {
+					case 'file':
+						var blob = item.getAsFile();
+						blob.name = 'Paste ' + new Date().toISOString() + '.png';
+						items.push(blob);
+						pass(items);
+						break;
 
-			switch (item.kind) {
-			case 'file':
-				var blob = item.getAsFile();
-				blob.name = 'Paste ' + new Date().toISOString() + '.png';
-				items.push(blob);
-				break;
-			case 'string':
-				item.getAsString(function(s) {
-					var blob = new Blob([s]);
-					blob.name = 'Paste ' + new Date().toISOString() + '.txt';
-					items.push(blob);
-					next();
+					case 'string':
+						item.getAsString(function(s) {
+							var blob = new Blob([s]);
+							blob.name = 'Paste ' + new Date().toISOString() + '.txt';
+							items.push(blob);
+							pass(items);
+						});
+						break;
+					}
 				});
-				return;
-			}
-			setTimeout(next, 1);
+			})(e.clipboardData.items[i]);
 		}
 
-		next();
+		c.then(function(pass, fail, items) {
+			uploadFiles(items);
+		}).pass([]);
 	}
 
 	function setURLList(urls) {
@@ -135,7 +135,7 @@
 							pass(result, totalLoaded);
 							break;
 						case 403:
-							window.location = '/-/login';
+							redirectLogin();
 							break;
 						default:
 							fail(resp);

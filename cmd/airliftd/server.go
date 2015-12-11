@@ -320,6 +320,11 @@ func getLogin(g *gas.Gas) (int, gas.Outputter) {
 		return reroute(g)
 	}
 
+	returnPath := g.FormValue("return")
+	if returnPath != "" {
+		return 303, out.Reroute("/-/login", returnPath)
+	}
+
 	return 200, out.HTML("login", false)
 }
 
@@ -329,6 +334,7 @@ func postLogin(g *gas.Gas) (int, gas.Outputter) {
 	if err := auth.SignIn(g, conf, g.FormValue("pass")); err != nil {
 		return 200, out.HTML("login", true)
 	}
+
 	return reroute(g)
 }
 

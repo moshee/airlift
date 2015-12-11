@@ -138,14 +138,20 @@
 						button.removeAttribute('disabled');
 					}
 
-					if (code === 204) {
+					switch (code) {
+					case 204:
 						$('#newpass').value = '';
 						reloadConfigValues();
 						reloadOverview();
 						showMessage('Configuration updated.', 'good');
 						pass();
-					} else {
+						break;
+					case 403:
+						redirectLogin();
+						break;
+					default:
 						fail(resp);
+						break;
 					}
 				});
 			}).catch(errorMessage).pass();
