@@ -367,6 +367,16 @@ input#twitter-card:checked ~ #twitter-card--hidden {
 
 #history ul {
 	list-style-type: none;
+	display: flex;
+	flex-flow: row wrap;
+	justify-content: center;
+	align-content: flex-start;
+	align-items: flex-start;
+	-webkit-display: flex;
+	-webkit-flex-flow: row wrap;
+	-webkit-justify-content: center;
+	-webkit-align-content: flex-start;
+	-webkit-align-items: flex-start;
 }
 
 .history-item {
@@ -510,7 +520,7 @@ input#twitter-card:checked ~ #twitter-card--hidden {
 	text-align: center;
 }
 
-@media screen and (max-width: 600px) {
+@media screen and (max-width: 768px) {
 	body {
 		padding: 32px 0;
 	}
@@ -527,6 +537,9 @@ input#twitter-card:checked ~ #twitter-card--hidden {
 	}
 	#history {
 		padding: 8px;
+	}
+	.history-item {
+		padding: 16px 8px;
 	}
 	.box[data-tooltip]:hover::before {
 		display: none !important;

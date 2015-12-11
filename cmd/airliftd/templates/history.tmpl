@@ -13,7 +13,7 @@
     <li class="history-item" data-id="{{ .ID }}">
       <a href="/{{ .ID }}{{ if $.Data.AppendExt }}{{ .Ext }}{{ end }}" class="upload-link">{{ if .HasThumb }}<img src="/-/thumb/{{ .ID }}.jpg">{{ else }}<img src="/-/static/file.svg"><div class="file-ext-overlay">{{ .Ext }}</div>{{ end }}</a>
       <div class="history-item-name" title="{{ .Name }}">{{ .Name }}</div>
-      <div class="history-item-data">{{ .Size }} / <span title="{{ .Uploaded.Format "2006-01-02 15:04:05 MST" }}">{{ .Ago }}</span> ago</div>
+      <div class="history-item-data">{{ .Size }} / <span title="{{ .Uploaded.Format "2006-01-02 15:04:05 MST" }}">{{ .Ago }}</span></div>
       <div class="history-item-data"><a href="javascript:" class="delete-upload">Delete</a></div>
     </li>
     {{ end }}
