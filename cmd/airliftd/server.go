@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image/jpeg"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -478,20 +479,20 @@ type historyPage struct {
 }
 
 func getHistory(g *gas.Gas) (int, gas.Outputter) {
-	return 303, out.Redirect("/-/history/0")
+	return 303, out.Redirect("/-/history/1")
 }
 
 func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 	page, err := g.IntArg("page")
-	if err != nil || page < 0 {
-		return 303, out.Redirect("/-/history/0")
+	if err != nil || page < 1 {
+		return 303, out.Redirect("/-/history/1")
 	}
 
 	l := fileCache.Len()
 
-	offset := page * itemsPerPage
+	offset := (page - 1) * itemsPerPage
 	if offset > l {
-		return 303, out.Redirect("/-/history/0")
+		return 303, out.Redirect("/-/history/1")
 	}
 	limit := itemsPerPage
 	if l < offset+limit {
@@ -500,14 +501,14 @@ func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 
 	conf := config.Get()
 
-	totalPages := l / itemsPerPage
+	totalPages := int(math.Ceil(float64(l) / float64(itemsPerPage)))
 	if totalPages == 0 {
 		totalPages = 1
 	}
 
 	p := &historyPage{
 		List:        getSortedList(offset, limit),
-		CurrentPage: page + 1,
+		CurrentPage: page,
 		TotalPages:  totalPages,
 		AppendExt:   conf.AppendExt,
 	}
@@ -518,7 +519,7 @@ func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 		}
 	}
 
-	if page > 0 {
+	if page > 1 {
 		p.PrevPage = page - 1
 	}
 
