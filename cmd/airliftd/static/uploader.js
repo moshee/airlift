@@ -91,7 +91,9 @@
 			}
 			svg.sacrificeChildren();
 
-			for (var i = acc = 0, pos; i < fileList.length; i++) {
+			var i, acc, pos;
+
+			for (i = acc = 0; i < fileList.length; i++) {
 				acc += fileList[i].size;
 				pos = acc/totalSize * svg.offsetWidth;
 				var line = makesvg('line');
