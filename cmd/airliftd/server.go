@@ -53,8 +53,8 @@ const (
 	// https://dev.twitter.com/cards/types/summary-large-image
 	// "Images for this Card should be at least 280px in width, and at least
 	// 150px in height. Image must be less than 1MB in size."
-	twitterThumbWidth  = 280
-	twitterThumbHeight = 150
+	twitterThumbWidth  = 700
+	twitterThumbHeight = 375
 
 	appDirName = ".airliftd"
 )
