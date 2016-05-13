@@ -1,0 +1,11 @@
+language: go
+go:
+    - 1.6.2
+go_import_path: ktkr.us/pkg/airlift
+install:
+    - go get ./...
+    - go get ktkr.us/pkg/vfs/cmd/bindata
+    - go generate ./...
+script:
+    - go install ./cmd/airliftd
+    - go test ./...

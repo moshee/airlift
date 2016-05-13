@@ -1,5 +1,7 @@
 # Airlift :package:
 
+[![Build Status](https://travis-ci.org/moshee/airlift.svg?branch=master)](https://travis-ci.org/moshee/airlift)
+
 Airlift is a self-hosted file upload and sharing service. The clients upload
 files to the server and return a nice link for you to share. Just bring your
 own server and domain.
