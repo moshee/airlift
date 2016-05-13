@@ -13,6 +13,7 @@ import (
 	"os/user"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -74,7 +75,7 @@ func main() {
 	flag.Parse()
 
 	if *flagVersion {
-		fmt.Println("airlift server", VERSION)
+		fmt.Printf("airlift server %s (%s)\n", VERSION, runtime.Version())
 		return
 	} else {
 		log.Println("this is airlift server", VERSION)
@@ -240,15 +241,12 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 		return 400, out.JSON(&Resp{Err: err.Error()})
 	}
 
-	pass := g.FormValue("password")
 	newpass := g.FormValue("newpass")
+	newpassConfirm := g.FormValue("newpass-confirm")
+	if newpass != newpassConfirm {
+		return 400, out.JSON(&Resp{Err: "passwords do not match"})
+	}
 	if conf.Password != nil {
-		if pass == "" {
-			return 403, out.JSON(&Resp{Err: "you forgot your password"})
-		}
-		if !auth.VerifyHash([]byte(pass), conf.Password, conf.Salt) {
-			return 403, out.JSON(&Resp{Err: "incorrect password"})
-		}
 		if newpass != "" {
 			conf.SetPass(newpass)
 		}

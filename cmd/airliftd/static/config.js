@@ -84,7 +84,10 @@
 			}, false);
 		}
 
-		$('#submit').addEventListener('click', function() {
+		$('#submit').addEventListener('click', function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+
 			for (var i = 0, button; button = buttons[i]; i++) {
 				button.setAttribute('disabled', true);
 			}
@@ -120,7 +123,7 @@
 			}).then(function(pass, fail) {
 				if (delta > 0) {
 					if (!confirm('Changes made to age or size limits mean that ' + delta + ' old file(s) will be pruned. Continue?')) {
-						return;
+						return false;
 					}
 				}
 
@@ -132,7 +135,7 @@
 				var fd     = new FormData($('#config'));
 
 				json('POST', '/-/config', fd, function(code, resp) {
-					$('#password').value = '';
+					$('#newpass-confirm').value = '';
 
 					for (var i = 0, button; button = buttons[i]; i++) {
 						button.removeAttribute('disabled');
@@ -155,6 +158,8 @@
 					}
 				});
 			}).catch(errorMessage).pass();
+
+			return false;
 		}, false);
 	}
 
