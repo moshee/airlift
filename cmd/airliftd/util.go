@@ -76,6 +76,9 @@ func checkLogin(g *gas.Gas) (int, gas.Outputter) {
 	return g.Continue()
 }
 
+// isLoggedIn returns true if the request contains a valid session cookie OR
+// there is no password configured for the server yet. A valid session will
+// only be returned if the former case occurs.
 func isLoggedIn(g *gas.Gas) (*auth.Session, bool) {
 	conf := config.Get()
 

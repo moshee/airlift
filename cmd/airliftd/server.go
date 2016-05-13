@@ -587,7 +587,10 @@ func getAgeLimitPrune(g *gas.Gas) (int, gas.Outputter) {
 }
 
 func getIndex(g *gas.Gas) (int, gas.Outputter) {
-	if _, ok := isLoggedIn(g); ok {
+	if sess, ok := isLoggedIn(g); ok {
+		if sess != nil {
+			sessions.Update(sess.Id)
+		}
 		return 200, out.HTML("index", &context{}, "common")
 	}
 	return 200, out.HTML("default-index", &context{})
