@@ -129,7 +129,7 @@ func main() {
 		out.TemplateFS(bindata.Root)
 	}
 
-	sessDir := filepath.Join(os.TempDir(), "airliftd-sessions")
+	sessDir := filepath.Join(appDir, "sessions")
 	os.RemoveAll(sessDir)
 	sessions = &auth.FileStore{Root: sessDir}
 	gas.AddDestructor(sessions.Destroy)
