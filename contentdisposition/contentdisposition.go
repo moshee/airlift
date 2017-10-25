@@ -9,10 +9,7 @@ import (
 	"strings"
 )
 
-// SetFilename adds a Content-Disposition header to the response to set an
-// alternate filename. It probably has proper formatting and non-ASCII
-// character support, as described by RFC 2616 and RFC 5987.
-func SetFilename(w http.ResponseWriter, filename string) {
+func makeHeader(filename string) string {
 	// For some reason Go doesn't provide access to the internal percent
 	// encoding routines, meaning we have to do this to get a fully
 	// percent-encoded string including spaces as %20.
@@ -26,5 +23,20 @@ func SetFilename(w http.ResponseWriter, filename string) {
 	escaped = strings.Replace(escaped, `"`, `\"`, -1)
 	// RFC5987 §3.2.1 - syntax of regular and extended header value encoding
 	disposition := fmt.Sprintf(`filename="%s"; filename*=UTF-8''%s`, escaped, encoded)
+	return disposition
+}
+
+// SetFilename adds a Content-Disposition header to the response to set an
+// alternate filename. It probably has proper formatting and non-ASCII
+// character support, as described by RFC 2616 and RFC 5987.
+func SetFilename(w http.ResponseWriter, filename string) {
+	disposition := makeHeader(filename)
+	w.Header().Set("Content-Disposition", disposition)
+}
+
+// SetAttachment is like SetFilename but it makes the browser treat the content
+// as an attachment and present a save dialog.
+func SetAttachment(w http.ResponseWriter, filename string) {
+	disposition := "attachment; " + makeHeader(filename)
 	w.Header().Set("Content-Disposition", disposition)
 }
