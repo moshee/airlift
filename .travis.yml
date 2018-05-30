@@ -1,6 +1,6 @@
 language: go
 go:
-    - 1.9.1
+    - "1.x"
 go_import_path: ktkr.us/pkg/airlift
 install:
     - go get ./...
