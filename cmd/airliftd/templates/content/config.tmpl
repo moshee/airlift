@@ -1,4 +1,6 @@
-{{ define "config" }}
+{{ define "title" }} • Configure{{ end }}
+
+{{ define "content" }}
   {{ template "%overview" . }}
   {{ template "%config" . }}
   <script src="/-/static/common.js"></script>
@@ -6,7 +8,7 @@
 {{ end }}
 
 {{ define "%config" }}
-{{ with .Data }}
+{{ with $.Data.Data }}
   <section id="section-config" class="floating-section">
     <h1>Configuration</h1>
     <form id="config" autocomplete="off">
@@ -68,7 +70,7 @@
 {{ end }}
 
 {{ define "%overview" }}
-{{ with .Data }}
+{{ with $.Data.Data }}
   <section id="section-overview" class="floating-section">
     <h1>Overview</h1>
     <p><strong><a href="/-/history/0">{{ .NumUploads }} upload{{ if ne .NumUploads 1 }}s{{ end }}</a></strong> totalling <strong>{{ .UploadsSize }}</strong>. (<a id="purge-all-link" href="javascript:void(0)">purge</a>)</p>

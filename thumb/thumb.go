@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"golang.org/x/image/bmp"
 	"golang.org/x/image/draw"
@@ -284,6 +285,7 @@ func (c *Cache) getThumb(th thumbID) {
 		log.Print("getThumb: ", err)
 		return
 	}
+	defer f.Close()
 
 	p := c.thumbPath(th)
 	os.MkdirAll(filepath.Dir(p), 0755)
@@ -292,6 +294,7 @@ func (c *Cache) getThumb(th thumbID) {
 		log.Print("getThumb: ", err)
 		return
 	}
+	defer dst.Close()
 
 	img, err := decoder(f)
 	if err != nil {
@@ -299,8 +302,7 @@ func (c *Cache) getThumb(th thumbID) {
 		return
 	}
 
-	thumb := produceThumbnail(img, th.w, th.h, c.scaler)
-	if err := c.enc.Encode(dst, thumb); err != nil {
+	if err = c.produceThumbnail(img, th.w, th.h, dst); err != nil {
 		os.Remove(p)
 		log.Print("getThumb: ", err)
 		return
@@ -409,25 +411,54 @@ func FormatSupported(ext string) bool {
 	return false
 }
 
-func thumbDimensions(wDest, hDest, wSrc, hSrc int) (w, h int) {
-	if wSrc > hSrc {
-		w = wDest
-		h = hSrc * wDest / wSrc
-	} else {
-		h = hDest
-		w = wSrc * hDest / hSrc
-	}
+var thumbPool sync.Pool
 
-	return
+func thumbDimensions(dst *image.Rectangle, src image.Rectangle) {
+	if src.Dx() > src.Dy() {
+		dst.Max.Y = dst.Min.Y + src.Dy()*dst.Dx()/src.Dx()
+	} else {
+		dst.Max.X = dst.Min.X + src.Dx()*dst.Dy()/src.Dy()
+	}
 }
 
-func produceThumbnail(src image.Image, w, h int, s draw.Scaler) image.Image {
-	wSrc, hSrc := src.Bounds().Dx(), src.Bounds().Dy()
-	if wSrc <= w && hSrc <= h {
-		return src
+func (c *Cache) produceThumbnail(src image.Image, w, h int, dst *os.File) error {
+	var (
+		dim   = image.Rect(0, 0, w, h)
+		thumb *image.NRGBA
+		ok    bool
+	)
+
+	if src.Bounds().In(dim) {
+		return c.enc.Encode(dst, src)
 	}
-	w, h = thumbDimensions(w, h, wSrc, hSrc)
-	thumb := image.NewNRGBA(image.Rect(0, 0, w, h))
-	s.Scale(thumb, thumb.Bounds(), src, src.Bounds(), draw.Src, nil)
-	return thumb
+
+	thumbDimensions(&dim, src.Bounds())
+
+	item := thumbPool.Get()
+	if item != nil {
+		log.Printf("got pool item %T", item)
+		thumb, ok = item.(*image.NRGBA)
+		if ok {
+			log.Println(dim, thumb.Bounds(), dim.In(thumb.Bounds()))
+			ok = dim.In(thumb.Bounds())
+		}
+	} else {
+		log.Println("empty pool")
+	}
+	if !ok {
+		log.Println("gonna allocate new thumb")
+		if thumb != nil {
+			u := dim.Union(thumb.Bounds())
+			log.Printf("making a new one to cover %v and %v: %v", dim, thumb.Bounds(), u)
+			thumb = image.NewNRGBA(u)
+		} else {
+			log.Printf("making one for just %v", dim)
+			thumb = image.NewNRGBA(dim)
+		}
+	}
+	defer thumbPool.Put(thumb)
+
+	c.scaler.Scale(thumb, dim, src, src.Bounds(), draw.Src, nil)
+	err := c.enc.Encode(dst, thumb.SubImage(dim))
+	return err
 }

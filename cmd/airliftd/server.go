@@ -43,6 +43,8 @@ var (
 	thumbCache *thumb.Cache
 	sessions   *auth.FileStore
 
+	// VERSION is the current version of the executable. It is overridden with
+	// build flags in the release process.
 	VERSION = "devel"
 )
 
@@ -60,6 +62,8 @@ const (
 	appDirName = ".airliftd"
 )
 
+// Resp represents a server response, containing either the generated resource
+// URL or an error.
 type Resp struct {
 	URL string `json:",omitempty"`
 	Err string `json:",omitempty"`
@@ -71,15 +75,17 @@ func main() {
 		flagRsrcDir = flag.String("rsrc", "", "Look for static and template resources in `DIR` (empty = use embedded resources)")
 		flagDebug   = flag.Bool("debug", false, "Enable debug/pprof server")
 		flagVersion = flag.Bool("v", false, "Show version and exit")
+
+		fs vfs.FileSystem
 	)
 	flag.Parse()
 
 	if *flagVersion {
 		fmt.Printf("airlift server %s (%s)\n", VERSION, runtime.Version())
 		return
-	} else {
-		log.Println("this is airlift server", VERSION)
 	}
+
+	log.Println("this is airlift server", VERSION)
 
 	u, err := user.Current()
 	if err != nil {
@@ -119,15 +125,16 @@ func main() {
 
 	if *flagRsrcDir != "" {
 		log.Print("using disk filesystem")
-		fs, err := vfs.NewNativeFS(*flagRsrcDir)
+		fs, err = vfs.Native(*flagRsrcDir)
 		if err != nil {
 			log.Fatal(err)
 		}
-		out.TemplateFS(fs)
 	} else {
 		log.Print("using binary filesystem")
-		out.TemplateFS(bindata.Root)
+		fs = bindata.Root
 	}
+
+	out.TemplateFS(fs)
 
 	sessDir := filepath.Join(appDir, "sessions")
 	os.RemoveAll(sessDir)
@@ -176,7 +183,7 @@ func main() {
 		}(code)
 	}
 
-	r.StaticHandler("/-", *flagRsrcDir).
+	r.StaticHandler("/-/static", vfs.Subdir(fs, "static")).
 		Get("/-/login", getLogin).
 		Get("/-/logout", getLogout).
 		Post("/-/login", postLogin).
@@ -216,7 +223,7 @@ func getConfig(g *gas.Gas) (int, gas.Outputter) {
 		fmtutil.Bytes(fileCache.Size()),
 		fmtutil.Bytes(thumbCache.Size()),
 	}
-	return 200, out.HTML("config", &context{data}, "common")
+	return 200, out.HTML("config/layout-full", &context{data})
 }
 
 func getConfigOverview(g *gas.Gas) (int, gas.Outputter) {
@@ -230,7 +237,7 @@ func getConfigOverview(g *gas.Gas) (int, gas.Outputter) {
 		fmtutil.Bytes(thumbCache.Size()),
 	}
 
-	return 200, out.HTML("%overview", &context{data})
+	return 200, out.HTML("config/%overview", &context{data})
 }
 
 func postConfig(g *gas.Gas) (int, gas.Outputter) {
@@ -253,11 +260,11 @@ func postConfig(g *gas.Gas) (int, gas.Outputter) {
 	} else {
 		if newpass == "" {
 			return 400, out.JSON(&Resp{Err: "cannot set empty password"})
-		} else {
-			conf.SetPass(newpass)
-			if err := auth.SignIn(g, conf, newpass); err != nil {
-				return 400, out.JSON(&Resp{Err: err.Error()})
-			}
+		}
+
+		conf.SetPass(newpass)
+		if err := auth.SignIn(g, conf, newpass); err != nil {
+			return 400, out.JSON(&Resp{Err: err.Error()})
 		}
 	}
 
@@ -324,14 +331,14 @@ func getLogin(g *gas.Gas) (int, gas.Outputter) {
 		return 303, out.Reroute("/-/login", returnPath)
 	}
 
-	return 200, out.HTML("login", false)
+	return 200, out.HTML("login/layout-lite", false)
 }
 
 func postLogin(g *gas.Gas) (int, gas.Outputter) {
 	conf := config.Get()
 
 	if err := auth.SignIn(g, conf, g.FormValue("pass")); err != nil {
-		return 200, out.HTML("login", true)
+		return 200, out.HTML("login/layout-lite", true)
 	}
 
 	return reroute(g)
@@ -363,7 +370,7 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 					if host == "" {
 						host = g.Request.Host
 					}
-					return 200, out.HTML("twitterbot", &struct {
+					return 200, out.HTML("twitterbot/content", &struct {
 						ID       string
 						Name     string
 						Uploaded time.Time
@@ -525,7 +532,7 @@ func getHistoryPage(g *gas.Gas) (int, gas.Outputter) {
 		p.NextPage = page + 1
 	}
 
-	return 200, out.HTML("history", &context{p}, "common")
+	return 200, out.HTML("history/layout-full", &context{p})
 }
 
 func getThumb(g *gas.Gas) (int, gas.Outputter) {
@@ -591,7 +598,7 @@ func getIndex(g *gas.Gas) (int, gas.Outputter) {
 		if sess != nil {
 			sessions.Update(sess.Id)
 		}
-		return 200, out.HTML("index", &context{}, "common")
+		return 200, out.HTML("index/layout-full", &context{})
 	}
-	return 200, out.HTML("default-index", &context{})
+	return 200, out.HTML("default-index/layout-lite", &context{})
 }

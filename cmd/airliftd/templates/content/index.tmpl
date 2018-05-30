@@ -1,0 +1,14 @@
+{{ define "content" }}
+  <section id="upload" class="floating-section">
+    <input type="file" id="picker" name="picker[]" multiple>
+    <div id="drop-zone">
+      <div class="progress-bar"></div>
+      <div id="drop-zone-text">Click/tap/drop/paste</div>
+    </div>
+    <div id="uploaded-urls">
+      <ul></ul>
+    </div>
+  </section>
+  <script src="/-/static/common.js"></script>
+  <script src="/-/static/uploader.js"></script>
+{{ end }}

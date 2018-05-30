@@ -1,29 +1,31 @@
-{{ define "history" }}
+{{ define "title" }} • Uploads{{ end }}
+
+{{ define "content" }}
 {{ template "%history" . }}
 <script src="/-/static/common.js"></script>
 <script src="/-/static/history.js"></script>
 {{ end }}
 
 {{ define "%history" }}
-{{ with .Data }}
+{{ with $.Data.Data }}
 <section id="history">
-  {{ if len .List | lt 25 }}{{ template "pagination" . }}{{ end }}
+  {{ if len .List | lt 25 }}{{ template "%pagination" . }}{{ end }}
   <ul>
     {{ range .List }}
     <li class="history-item" data-id="{{ .ID }}">
-      <a href="/{{ .ID }}{{ if $.Data.AppendExt }}{{ .Ext }}{{ end }}" class="upload-link">{{ if .HasThumb }}<img src="/-/thumb/{{ .ID }}.jpg">{{ else }}<img src="/-/static/file.svg"><div class="file-ext-overlay">{{ .Ext }}</div>{{ end }}</a>
+      <a href="/{{ .ID }}{{ if $.Data.Data.AppendExt }}{{ .Ext }}{{ end }}" class="upload-link">{{ if .HasThumb }}<img src="/-/thumb/{{ .ID }}.jpg">{{ else }}<img src="/-/static/file.svg"><div class="file-ext-overlay">{{ .Ext }}</div>{{ end }}</a>
       <div class="history-item-name" title="{{ .Name }}">{{ .Name }}</div>
       <div class="history-item-data">{{ .Size }} / <span title="{{ .Uploaded.Format "2006-01-02 15:04:05 MST" }}">{{ .Ago }}</span></div>
       <div class="history-item-data"><a href="javascript:" class="delete-upload">Delete</a></div>
     </li>
     {{ end }}
   </ul>
-  {{ template "pagination" . }}
+  {{ template "%pagination" . }}
 </section>
 {{ end }}
 {{ end }}
 
-{{ define "pagination" }}
+{{ define "%pagination" }}
 <nav class="pagination">
   <span class="prevnext{{ if gt .CurrentPage 1 }} active{{ end }}"><a href="/-/history/{{ .PrevPage }}">Back</a> —</span>
   Page {{ .CurrentPage }} of {{ .TotalPages }}

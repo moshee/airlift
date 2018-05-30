@@ -1,0 +1,41 @@
+{{ define "head" }}
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="shortcut icon" href="/-/static/favicon.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/-/static/airlift_76x76.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/-/static/airlift_120x120.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/-/static/airlift_152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/-/static/airlift_180x180.png">
+    <link rel="stylesheet" href="/-/static/style.css">
+{{ end }}
+
+{{ define "layout-full" }}
+<html>
+  <head>
+    <title>Airlift{{ block "title" . }}{{ end }}</title>
+    {{ template "head" }}
+  </head>
+  <body>
+    <div id="message-box"></div>
+    <nav id="nav">
+      <a href="/">Upload</a> /
+      <a href="/-/history/1">History</a> /
+      <a href="/-/config">Configure</a> /
+      <a href="/-/logout">Log out</a>
+    </nav>
+    {{ block "content" $ }}{{ end  }}
+    <div id="version">airliftd {{ $.Data.Version }}</div>
+  </body>
+</html>
+{{ end }}
+
+{{ define "layout-lite" }}
+<html>
+  <head>
+    <title>Airlift{{ block "title" . }}{{ end }}</title>
+    {{ template "head" }}
+  </head>
+  <body>
+    {{ block "content" $ }}{{ end  }}
+  </body>
+</html>
+{{ end }}

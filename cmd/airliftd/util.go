@@ -83,11 +83,11 @@ func isLoggedIn(g *gas.Gas) (*auth.Session, bool) {
 	conf := config.Get()
 
 	if conf.Password != nil {
-		if sess, _ := auth.GetSession(g); sess == nil {
+		sess, _ := auth.GetSession(g)
+		if sess == nil {
 			return nil, false
-		} else {
-			return sess, true
 		}
+		return sess, true
 	}
 
 	return nil, true
@@ -105,6 +105,7 @@ func reroute(g *gas.Gas) (int, gas.Outputter) {
 	return 302, out.Redirect(path)
 }
 
+// File represents a single upload on disk.
 type File struct {
 	ID       string
 	Name     string
@@ -113,10 +114,13 @@ type File struct {
 	Size     fmtutil.Bytes
 }
 
+// Ext returns the file extension of the upload's file name on disk.
 func (f *File) Ext() string {
 	return filepath.Ext(f.Name)
 }
 
+// Ago returns a human-readable string describing how long ago the file was
+// uploaded.
 func (f *File) Ago() string {
 	n := time.Now().Sub(f.Uploaded)
 	if n < time.Second {
