@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
+	"html/template"
+	"io/ioutil"
 	"image/jpeg"
 	"log"
 	"math"
@@ -21,10 +24,15 @@ import (
 
 	"golang.org/x/image/draw"
 
+	"github.com/alecthomas/chroma"
+	"github.com/alecthomas/chroma/formatters/html"
+	"github.com/alecthomas/chroma/lexers"
+	"github.com/alecthomas/chroma/styles"
+
 	_ "net/http/pprof"
 
 	"ktkr.us/pkg/airlift/cache"
-	"ktkr.us/pkg/airlift/config"
+	"airlift/config"
 	"ktkr.us/pkg/airlift/contentdisposition"
 	"ktkr.us/pkg/airlift/thumb"
 	"ktkr.us/pkg/fmtutil"
@@ -400,8 +408,59 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	// enable browser caching for resources behind TLS
 	g.Header().Set("Cache-Control", "public")
 
-	http.ServeFile(g, g.Request, file)
+	if g.Request.URL.RawQuery == "raw" || !conf.SyntaxEnable {
+		http.ServeFile(g, g.Request, file)
+	} else {
 
+		extension := strings.SplitN(filepath.Ext(file), ".", 2)[1]
+
+		// Find lexer for file's extension
+		lexer := lexers.Get(extension)
+		if lexer != nil {
+			lexer = chroma.Coalesce(lexer)
+		
+			s := styles.Get(conf.SyntaxTheme)
+			if s == nil {
+				s = styles.Fallback
+			}
+
+			// Read file to string
+			buffer, err := ioutil.ReadFile(file)
+			contents := string(buffer)
+
+			// Setup formatter & iterate over file
+			formatter := html.New(html.WithClasses(), html.TabWidth(2)/*, html.WithLineNumbers()*/)
+			iterator, err := lexer.Tokenise(nil, contents)
+		
+			// Get CSS and HTML
+			cssBuffer := new(bytes.Buffer)
+			err = formatter.WriteCSS(cssBuffer, s)
+			htmlBuffer := new(bytes.Buffer)
+			err = formatter.Format(htmlBuffer, s, iterator)
+	
+			if err != nil {
+				log.Print(err)
+				http.ServeFile(g, g.Request, file)
+			} else {
+
+				// Render template
+				data := &struct {
+					CSS template.CSS
+					HTML template.HTML
+					Filename string
+				}{
+					template.CSS(cssBuffer.String()),
+					template.HTML(htmlBuffer.String()),
+					strings.SplitN(filepath.Base(file), ".", 2)[1],
+				}
+				return 200, out.HTML("syntax/content", &context{data})
+			}
+
+		} else {
+			// Could not find a matching lexer. Serve file directly.
+			http.ServeFile(g, g.Request, file)
+		}
+	}
 	return -1, nil
 }
 

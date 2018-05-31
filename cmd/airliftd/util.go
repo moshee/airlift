@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"ktkr.us/pkg/airlift/config"
+	"airlift/config"
 	"ktkr.us/pkg/fmtutil"
 	"ktkr.us/pkg/gas"
 	"ktkr.us/pkg/gas/auth"

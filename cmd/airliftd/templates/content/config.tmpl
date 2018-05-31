@@ -27,6 +27,17 @@
         <input type="checkbox" id="append-ext" name="append-ext"{{ if .Conf.AppendExt }} checked{{ end }}>
         <label for="append-ext">Append File Extensions</label>
       </div>
+      <div class="box check-enable" data-tooltip="Enable to render text files with syntax highlighting." data-tt-pos="left">
+        <input type="checkbox" class="hider" name="syntax-enable"{{ if .Conf.SyntaxEnable }} checked{{ end }}>
+        <label for="syntax-enable">Syntax Highlighting</label>
+        <div class="hidee">
+          <label for="syntax-theme">Syntax Theme</label>
+          <input type="text" id="syntax-theme" name="syntax-theme" value="{{ .Conf.SyntaxTheme }}" required placeholder="monokai"{{ if not .Conf.SyntaxEnable }} disabled{{ end }}>
+        </div>
+        <small style="display: block;padding-top: 15px;padding-left: 30px;">
+          <a href="https://xyproto.github.io/splash/docs/" target="_blank">View available themes</a>
+        </small>
+      </div>
       <div class="box check-enable">
         <input type="checkbox" class="hider" id="enable-age-prune" name="enable-age-prune"{{ if .Conf.MaxAgeEnable }} checked{{ end }}>
         <label for="enable-age-prune">Limit Upload Age</label>

@@ -1,0 +1,120 @@
+{{ define "content" }}
+{{ with $.Data.Data }}
+<html>
+<head>
+  <title>{{ .Filename }}</title>
+  <style type="text/css">
+  nav {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    border-radius: 5px;
+    color: black;
+    font-family: sans-serif;
+  }
+
+  nav .copied {
+    text-align: center;
+    position: absolute;
+    width: 100%;
+    bottom: -25px;
+    left: 0;
+    opacity: 0;
+  }
+
+  nav li {
+    display: flex;
+    align-items: center;
+    height: 20px;
+    padding: 10px;
+    background: white;
+    color: black;
+    list-style-type: none;
+    cursor: pointer;
+  }
+
+  nav li:hover { background: #d1d1d1; }
+  nav li:first-of-type { 
+    cursor: default;
+    border-radius: 5px 0 0 5px;
+  }
+  nav li:first-of-type:hover { background: white; }
+  nav li:last-of-type {
+    border-radius: 0 5px 5px 0;
+    padding: 10px 0;
+  }
+  nav li > a {
+    color: inherit;
+    padding: 11px;
+  }
+
+  nav svg { 
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+  }
+
+  .animate {
+    animation-duration: 2s;
+    animation-name: fadeInUp;
+  }
+
+  @keyframes fadeInUp {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, 100%, 0);
+    }
+
+    40% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+    
+    100% {
+      opacity: 0;
+    }
+  }
+  {{ .CSS }}
+  </style>
+</head>
+<body class="chroma">
+  <nav>
+    <li>{{ .Filename }}</li>
+    <li class="copy">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+    </li>
+    <li>
+      <a href="?raw">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      </a>
+    </li>
+    <span class="copied chroma k">Copied!</span>
+  </nav>
+  <main>{{ .HTML}}</main>
+
+  <script src="/-/static/clipboard-polyfill.js"></script>
+  <script>
+  document.querySelector('nav .copy').addEventListener('click', () => {
+    var contents = document.querySelector('main');  
+    var range = document.createRange();  
+    range.selectNode(contents);  
+
+  
+    clipboard.writeText(range)
+      .then(() => {
+          document.querySelector('nav .copied').classList.add('animate')
+          setTimeout(function(){
+            document.querySelector('nav .copied').classList.remove('animate')
+          }, 1000)
+      })
+      .catch(() => {
+        console.log('Failed to copy text.');
+      });
+  });
+  </script>
+</body>
+</html>
+{{ end }}
+{{ end }}
