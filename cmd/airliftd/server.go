@@ -408,60 +408,61 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	// enable browser caching for resources behind TLS
 	g.Header().Set("Cache-Control", "public")
 
-	if g.Request.URL.RawQuery == "raw" || !conf.SyntaxEnable {
+	// Find lexer for file's extension
+	extension := strings.TrimLeft(filepath.Ext(file), ".")
+	lexer := lexers.Get(extension)
+
+	if g.Request.URL.RawQuery == "raw" ||
+		 strings.Contains(g.Request.UserAgent(), "curl") ||
+		 strings.Contains(g.Request.UserAgent(), "wget") ||
+		 !conf.SyntaxEnable ||
+		 lexer == nil {
 		http.ServeFile(g, g.Request, file)
-	} else {
-
-		extension := strings.SplitN(filepath.Ext(file), ".", 2)[1]
-
-		// Find lexer for file's extension
-		lexer := lexers.Get(extension)
-		if lexer != nil {
-			lexer = chroma.Coalesce(lexer)
-		
-			s := styles.Get(conf.SyntaxTheme)
-			if s == nil {
-				s = styles.Fallback
-			}
-
-			// Read file to string
-			buffer, err := ioutil.ReadFile(file)
-			contents := string(buffer)
-
-			// Setup formatter & iterate over file
-			formatter := html.New(html.WithClasses(), html.TabWidth(2)/*, html.WithLineNumbers()*/)
-			iterator, err := lexer.Tokenise(nil, contents)
-		
-			// Get CSS and HTML
-			cssBuffer := new(bytes.Buffer)
-			err = formatter.WriteCSS(cssBuffer, s)
-			htmlBuffer := new(bytes.Buffer)
-			err = formatter.Format(htmlBuffer, s, iterator)
-	
-			if err != nil {
-				log.Print(err)
-				http.ServeFile(g, g.Request, file)
-			} else {
-
-				// Render template
-				data := &struct {
-					CSS template.CSS
-					HTML template.HTML
-					Filename string
-				}{
-					template.CSS(cssBuffer.String()),
-					template.HTML(htmlBuffer.String()),
-					strings.SplitN(filepath.Base(file), ".", 2)[1],
-				}
-				return 200, out.HTML("syntax/content", &context{data})
-			}
-
-		} else {
-			// Could not find a matching lexer. Serve file directly.
-			http.ServeFile(g, g.Request, file)
-		}
+		return -1, nil
 	}
-	return -1, nil
+
+	lexer = chroma.Coalesce(lexer)
+	s := styles.Get(conf.SyntaxTheme)
+	if s == nil {
+		s = styles.Fallback
+	}
+
+	// Serve non-text files that slipped through, read text files to string
+	buffer, err := ioutil.ReadFile(file)
+	contentType := http.DetectContentType(buffer)
+	if !strings.Contains(contentType, "text/"){
+		http.ServeFile(g, g.Request, file)
+		return -1, nil
+	}
+	contents := string(buffer)
+
+	// Setup formatter & iterate over file
+	formatter := html.New(html.WithClasses(), html.TabWidth(2)/*, html.WithLineNumbers()*/)
+	iterator, err := lexer.Tokenise(nil, contents)
+
+	// Get CSS and HTML
+	cssBuffer := new(bytes.Buffer)
+	err = formatter.WriteCSS(cssBuffer, s)
+	htmlBuffer := new(bytes.Buffer)
+	err = formatter.Format(htmlBuffer, s, iterator)
+
+	if err != nil {
+		log.Print(err)
+		http.ServeFile(g, g.Request, file)
+		return -1, nil
+	}
+
+	// Render template
+	data := &struct {
+		CSS template.CSS
+		HTML template.HTML
+		Filename string
+	}{
+		template.CSS(cssBuffer.String()),
+		template.HTML(htmlBuffer.String()),
+		strings.SplitN(filepath.Base(file), ".", 2)[1],
+	}
+	return 200, out.HTML("syntax/content", &context{data})
 }
 
 func postFile(g *gas.Gas) (int, gas.Outputter) {
