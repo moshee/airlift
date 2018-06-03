@@ -443,9 +443,7 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	formatter := html.New(html.WithClasses())
 	iterator, err := lexer.Tokenise(nil, contents)
 
-	// Get CSS and HTML
-	cssBuffer := new(bytes.Buffer)
-	err = formatter.WriteCSS(cssBuffer, s)
+	// Get HTML
 	htmlBuffer := new(bytes.Buffer)
 	err = formatter.Format(htmlBuffer, s, iterator)
 
