@@ -433,7 +433,7 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	// Serve non-text files that slipped through, read text files to string
 	buffer, err := ioutil.ReadFile(file)
 	contentType := http.DetectContentType(buffer)
-	if !strings.Contains(contentType, "text/"){
+	if !strings.Contains(contentType, "text/plain"){
 		http.ServeFile(g, g.Request, file)
 		return -1, nil
 	}
