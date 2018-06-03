@@ -44,6 +44,7 @@ import (
 )
 
 //go:generate bindata -skip=*.sw[nop] static templates
+//go:generate ./gen_styles.sh
 
 var (
 	appDir     string // the place where all the stuff is stored
@@ -225,11 +226,13 @@ func getConfig(g *gas.Gas) (int, gas.Outputter) {
 		NumUploads  int
 		UploadsSize fmtutil.Bytes
 		ThumbsSize  fmtutil.Bytes
+		SyntaxThemes []string
 	}{
 		config.Get(),
 		fileCache.Len(),
 		fmtutil.Bytes(fileCache.Size()),
 		fmtutil.Bytes(thumbCache.Size()),
+		styles.Names(),
 	}
 	return 200, out.HTML("config/layout-full", &context{data})
 }
@@ -437,7 +440,7 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	contents := string(buffer)
 
 	// Setup formatter & iterate over file
-	formatter := html.New(html.WithClasses(), html.TabWidth(2)/*, html.WithLineNumbers()*/)
+	formatter := html.New(html.WithClasses())
 	iterator, err := lexer.Tokenise(nil, contents)
 
 	// Get CSS and HTML
@@ -454,11 +457,11 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 
 	// Render template
 	data := &struct {
-		CSS template.CSS
+		SyntaxTheme string
 		HTML template.HTML
 		Filename string
 	}{
-		template.CSS(cssBuffer.String()),
+		s.Name,
 		template.HTML(htmlBuffer.String()),
 		strings.SplitN(filepath.Base(file), ".", 2)[1],
 	}

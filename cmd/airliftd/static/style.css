@@ -82,7 +82,7 @@ label {
 	font-size: 14px;
 	color: #666;
 }
-input[type=text], input[type=password], input[type=number] {
+input[type=text], input[type=password], input[type=number], select {
 	width: 100%;
 	padding: 8px;
 	margin: 8px 0;
@@ -271,6 +271,12 @@ input[type=range]::-ms-fill-upper {
 	margin-left: -128px;
 	bottom: 100%;
 	margin-bottom: 16px;
+}
+.box.check-enable small {
+	display: block;
+	position: absolute;
+	padding-top: 15px;
+	padding-left: 30px;
 }
 .hidee {
 	float: right;
@@ -554,6 +560,10 @@ input#twitter-card:checked ~ #twitter-card--hidden {
 	}
 	input[type=checkbox] {
 		float: right;
+	}
+	.box.check-enable small {
+		display: inline;
+		position: relative;
 	}
 	.hider, .hider + label {
 		margin-bottom: 16px;
