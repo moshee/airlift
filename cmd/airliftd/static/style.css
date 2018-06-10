@@ -132,7 +132,7 @@ input[type=checkbox]:checked:after {
 	text-align: center;
 	color: #f0f0f0;
 }
-input:focus {
+input:focus, select:focus {
 	outline: none;
 	border: 2px solid #888;
 	margin: 7px -1px;

@@ -1,3 +1,3 @@
 package main
 
-import _ "airlift/cmd/airliftd/bindata_files"
+import _ "ktkr.us/pkg/airlift/cmd/airliftd/bindata_files"

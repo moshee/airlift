@@ -9,7 +9,10 @@ GIT_REV=$(git rev-list HEAD --count)
 cat > version.go <<END
 package main
 
+import "time"
+
 func init() {
 	VERSION = "$GIT_TAG (r$GIT_REV)"
+	MODTIME = time.Unix($(date +%s), 0)
 }
 END

@@ -74,7 +74,7 @@
 		var boxes = $$('.check-enable');
 		for (var i = 0, b; b = boxes[i]; i++) {
 			var hider = b.querySelector('.hider');
-			hider.hidee = b.querySelector('.hidee input');
+			hider.hidee = b.querySelector('.hidee input, .hidee select');
 			hider.addEventListener('click', function() {
 				if (this.checked) {
 					this.hidee.removeAttribute('disabled');

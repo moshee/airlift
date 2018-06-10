@@ -49,8 +49,8 @@ type Config struct {
 	AppendExt         bool   `form:"append-ext"`   // append extensions to returned file URLs
 	TwitterCardEnable bool   `form:"twitter-card"` // enable Twitter Card preview for embeddable files
 	TwitterHandle     string `form:"twitter-handle"`
-	SyntaxEnable			bool   `form:"syntax-enable"` // enable syntax highlighting for text files
-	SyntaxTheme				string `form:"syntax-theme"`  // Chroma syntax highlight theme
+	SyntaxEnable      bool   `form:"syntax-enable"` // enable syntax highlighting for text files
+	SyntaxTheme       string `form:"syntax-theme"`  // Chroma syntax highlight theme
 }
 
 // Secrets satisfies gas.User interface.
