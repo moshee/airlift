@@ -52,13 +52,12 @@ wherever you want in your `$PATH`.
 ### Or if you want to build it yourself
 
 1. [Install Go](http://golang.org/doc/install) and git
-2. `$ mkdir ~/go && export GOPATH=~/go` (you can use any place as your [GOPATH][2])
-3. `$ go get -d -u ktkr.us/pkg/airlift/cmd/airliftd`
-4. `$ airliftd`
+2. If you don't already have a [`GOPATH`][2]: `$ mkdir ~/go && export GOPATH=~/go` (you can use any place as your `GOPATH`)
+3. `$ go get ktkr.us/pkg/airlift/cmd/airliftd`
 
 [2]: https://github.com/golang/go/wiki/GOPATH
 
-I haven't tried to build or run it on Windows, YMMV. Works on OS X and
+I haven't tried to build or run it on Windows, YMMV. Works on macOS and
 GNU+Linux.
 
 ## Updating
@@ -68,10 +67,13 @@ GNU+Linux.
 
 ## Usage
 
-In normal usage, a binary built after running `go generate` will run
-standalone. Just put it in your `$PATH` and run it.
+To run server:
 
-In development, pass the flag `-rsrc .` to instruct it to load files from disk
+```
+$ airliftd
+```
+
+In development, you can pass the flag `-rsrc .` to instruct it to load files from disk
 rooted in the working directory.
 
 The server runs in the console. You can use whatever tools you want to
@@ -166,13 +168,17 @@ Twitterbot.
 **Twitter Handle** []: Twitter Cards require that the Twitter handle of the
 source's creator is included in the metadata.
 
+**Syntax Highlighting** [off]: Enable to serve text-based files with syntax
+highlighting. The raw file can be requested by appending `?raw=1` to the URL.
+
+**Syntax Theme** []: Set the syntax highlighting color scheme.
+
 **Upload Directory** [~/.airlift-server/uploads]: This is where uploaded files
 will be stored.
 
 **New Password** []: Change your password here.
 
-**Current Password**: Every time you update the config, you need to confirm
-your current password.
+**Confirm New Password** []: Enter the new password again to confirm.
 
 ### HTTPS
 
