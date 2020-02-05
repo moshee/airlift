@@ -161,7 +161,7 @@ func main() {
 		log.Fatalln("file list:", err)
 	}
 	thumbDir := filepath.Join(appDir, "thumb-cache")
-	thumbEnc := thumb.JPEGEncoder{&jpeg.Options{Quality: 88}}
+	thumbEnc := thumb.JPEGEncoder{Options: &jpeg.Options{Quality: 88}}
 	thumbCache, err = thumb.NewCache(thumbDir, thumbEnc, fileCache, draw.BiLinear)
 	if err != nil {
 		log.Fatalln("thumb cache:", err)
@@ -509,7 +509,7 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	contents := string(buffer)
 
 	// Setup formatter & iterate over file
-	formatter := html.New(html.WithClasses())
+	formatter := html.New(html.WithClasses(true))
 	iterator, err := lexer.Tokenise(nil, contents)
 
 	// Get HTML
