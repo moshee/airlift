@@ -126,6 +126,7 @@ func Load() (*Config, error) {
 	conf := Default
 
 	confFile, err := os.Open(confPath)
+	defer confFile.Close()
 	if err != nil {
 		if os.IsNotExist(err) {
 			mu.RUnlock()

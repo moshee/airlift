@@ -55,6 +55,7 @@ func New(dirPath string) (*Cache, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer dir.Close()
 	fis, err := dir.Readdir(0)
 	if err != nil {
 		return nil, err
@@ -64,6 +65,10 @@ func New(dirPath string) (*Cache, error) {
 		c.size += fi.Size()
 		name := fi.Name()
 		id := strings.Split(name, ".")[0]
+		if id == "" {
+			log.Println("hidden file ", name)
+			continue
+		}
 		c.files[id] = fi
 	}
 
