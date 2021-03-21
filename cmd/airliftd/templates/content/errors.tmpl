@@ -7,7 +7,7 @@
   <body>
     <div class="error">
       <h1>You're doing it wrong.</h1>
-      {{ if .Err }}<p>{{ .Err }}</p>{{ end }}
+      {{ with $.Data }}<p>{{ .Err }}</p>{{ end }}
     </div>
   </body>
 </html>
@@ -34,7 +34,7 @@
   <body>
     <div class="error">
       <h1>Something went wrong.</h1>
-      {{ if .Err }}<p>{{ .Err }}</p>{{ end }}
+      {{ with $.Data }}<p>{{ .Err }}</p>{{ end }}
     </div>
   </body>
 </html>

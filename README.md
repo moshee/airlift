@@ -203,7 +203,7 @@ executable and HTTP requests will redirect to HTTPS.
 
 # lift
 
-`lift` is a CLI client interface to `airlift-server`. It takes a filename as an
+`lift` is a CLI client interface to `airliftd`. It takes a filename as an
 argument and uploads the server at the configured host, which is stored as a
 JSON file in an OS-dependent location (`~/.airlift` on POSIX,
 `%LOCALAPPDATA%\airlift\airlift_config` on Windows). These may also be
