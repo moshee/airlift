@@ -443,10 +443,20 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	if err != nil {
 		return 500, out.Error(g, err)
 	}
-
 	defer f.Close()
 
-	buf := make([]byte, 512)
+	fi, err := f.Stat()
+	if err != nil {
+		return 500, out.Error(g, err)
+	}
+
+	bufsize := 512
+	fsize := int(fi.Size())
+	if fsize < bufsize {
+		bufsize = fsize
+	}
+
+	buf := make([]byte, bufsize)
 	_, err = io.ReadFull(f, buf)
 	if err != nil {
 		return 500, out.Error(g, err)
