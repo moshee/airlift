@@ -27,7 +27,6 @@ int get_term_width(void) {
 import "C"
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/user"
@@ -60,7 +59,7 @@ func termClearLine() {
 }
 
 func termMoveUp() {
-	fmt.Print(os.Stderr, "\033[A")
+	os.Stderr.WriteString("\033[A")
 }
 
 func termReturn0() {
