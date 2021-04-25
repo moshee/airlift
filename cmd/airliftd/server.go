@@ -219,7 +219,6 @@ func main() {
 		Delete("/{id}", checkPassword, deleteFile).
 		Post("/-/delete/{id}", checkLogin, deleteFile).
 		Get("/{id}/{filename}", getFile).
-		Get("/{id}.{ext}", getFile).
 		Get("/{id}", getFile).
 		Get("/", getIndex).
 		Ignition()
@@ -386,7 +385,20 @@ func getFile(g *gas.Gas) (int, gas.Outputter) {
 	id := g.Arg("id")
 	file := fileCache.Get(id)
 	if file == "" {
-		return 404, out.Error(g, errors.New("ID not found"))
+		// let's try without the extension
+		if !strings.Contains(id, ".") {
+			return 404, out.Error(g, errors.New("ID not found"))
+		}
+		split := strings.Split(id, ".")
+		// will not panic since there is at least one dot
+		file = fileCache.Get(strings.Join(split[:len(split)-1], "."))
+		if file == "" {
+			return 404, out.Error(g, errors.New("ID not found"))
+		}
+		fi := fileCache.Stat(id)
+		if fi == nil || strings.SplitN(fi.Name(), ".", 2)[0] == "dummy" {
+			return 404, out.Error(g, errors.New("ID not found"))
+		}
 	}
 
 	form := struct {
@@ -557,16 +569,26 @@ func postFile(g *gas.Gas) (int, gas.Outputter) {
 	}
 	defer g.Body.Close()
 
+	host := conf.Host
+	if host == "" {
+		host = g.Request.Host
+	}
+
+	if g.Request.URL.Query().Get("preserveName") == "true" {
+		err := fileCache.PutNoHash(g.Body, filename, conf)
+		if err != nil {
+			log.Println(g.Request.Method, "postFile:", err)
+			return 500, out.JSON(&Resp{Err: err.Error()})
+		}
+		return 201, out.JSON(&Resp{URL: path.Join(host, filename)})
+	}
+
 	hash, err := fileCache.Put(g.Body, filename, conf)
 	if err != nil {
 		log.Println(g.Request.Method, "postFile:", err)
 		return 500, out.JSON(&Resp{Err: err.Error()})
 	}
 
-	host := conf.Host
-	if host == "" {
-		host = g.Request.Host
-	}
 	if conf.AppendExt {
 		hash += filepath.Ext(filename)
 	}

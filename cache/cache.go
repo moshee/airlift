@@ -2,6 +2,7 @@
 package cache
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -69,6 +70,9 @@ func New(dirPath string) (*Cache, error) {
 			log.Println("hidden file ", name)
 			continue
 		}
+		if id == "dummy" {
+			id = strings.Join(strings.Split(name, ".")[1:], ".")
+		}
 		c.files[id] = fi
 	}
 
@@ -133,7 +137,7 @@ func (c *Cache) Put(content io.Reader, filename string, conf Config) (string, er
 		sha.Read(buf)
 		hash = conf.ProcessHash(buf)
 
-		if _, exist := c.files[hash]; exist {
+		if _, exist := c.files[hash]; exist || hash == "dummy" {
 			log.Printf("cache: collision detected with ID '%s' - regenerating", hash)
 		} else {
 			break
@@ -175,6 +179,59 @@ func (c *Cache) Put(content io.Reader, filename string, conf Config) (string, er
 	c.Unlock()
 
 	return hash, nil
+}
+
+// PutNoHsh copies a file to disk with the given filename, preserving the name
+func (c *Cache) PutNoHash(content io.Reader, filename string, conf Config) error {
+	if _, exist := c.files[filename]; exist {
+		return fmt.Errorf("A file with the same name already exists")
+	}
+
+	os.MkdirAll(c.dir, 0700)
+	dest := filepath.Join(c.dir, fmt.Sprintf("dummy.%s", filename))
+	destFile, err := os.OpenFile(dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+	if err != nil {
+		os.Remove(dest)
+		return err
+	}
+
+	defer destFile.Close()
+
+	w := io.MultiWriter(destFile)
+	_, err = io.Copy(w, content)
+	if err != nil {
+		os.Remove(dest)
+		return err
+	}
+
+	fi, err := os.Stat(dest)
+	if err != nil {
+		os.Remove(dest)
+		return err
+	}
+
+	if conf.MaxSize() > 0 {
+		_, err = c.CutToSize(conf.MaxSize() * 1024 * 1024)
+		if err != nil {
+			os.Remove(dest)
+			return err
+		}
+	}
+
+	if conf.MaxCount() > 0 {
+		_, err = c.CutToCount(conf.MaxCount() - 1)
+		if err != nil {
+			os.Remove(dest)
+			return err
+		}
+	}
+
+	c.Lock()
+	c.files[filename] = fi
+	c.size += fi.Size()
+	c.Unlock()
+
+	return nil
 }
 
 func (c *Cache) removeFile(id string) error {

@@ -17,19 +17,20 @@ import (
 )
 
 var (
-	flag_host     = flag.String("h", "", "Set host to upload to")
-	flag_port     = flag.String("p", "", "Set port or interface of remote server to upload to")
-	flag_addr     = flag.String("a", "", "Set whole address of server to upload to")
-	flag_name     = flag.String("f", "", "Specify a different filename to use. If -z, it names the zip archive")
-	flag_stdin    = flag.String("s", "", "Give stdin stream a filename")
-	flag_remove   = flag.String("r", "", "Instruct the server to delete the file with a given ID")
-	flag_zip      = flag.Bool("z", false, "Upload the input file(s) (and stdin) as a single zip file")
-	flag_inclname = flag.Bool("n", false, "Include filename in returned URL (overrides -e)")
-	flag_inclext  = flag.Bool("e", false, "Append file extension to returned URL")
-	flag_nocopy   = flag.Bool("C", false, "Do not copy link to clipboard")
-	flag_noprog   = flag.Bool("P", false, "Do not show progress bar")
-	flag_oops     = flag.Bool("oops", false, "Delete the last file uploaded")
-	dotfilePath   string
+	flag_host         = flag.String("h", "", "Set host to upload to")
+	flag_port         = flag.String("p", "", "Set port or interface of remote server to upload to")
+	flag_addr         = flag.String("a", "", "Set whole address of server to upload to")
+	flag_name         = flag.String("f", "", "Specify a different filename to use. If -z, it names the zip archive")
+	flag_stdin        = flag.String("s", "", "Give stdin stream a filename")
+	flag_remove       = flag.String("r", "", "Instruct the server to delete the file with a given ID")
+	flag_zip          = flag.Bool("z", false, "Upload the input file(s) (and stdin) as a single zip file")
+	flag_inclname     = flag.Bool("n", false, "Include filename in returned URL (overrides -e)")
+	flag_inclext      = flag.Bool("e", false, "Append file extension to returned URL")
+	flag_preservename = flag.Bool("k", false, "Preserve file name")
+	flag_nocopy       = flag.Bool("C", false, "Do not copy link to clipboard")
+	flag_noprog       = flag.Bool("P", false, "Do not show progress bar")
+	flag_oops         = flag.Bool("oops", false, "Delete the last file uploaded")
+	dotfilePath       string
 )
 
 func init() {
@@ -379,7 +380,12 @@ func postFile(conf *Config, upload FileUpload) string {
 			body = file
 		}
 
-		req, err := http.NewRequest("POST", conf.BaseURL("/upload/file"), body)
+		postURL := conf.BaseURL("/upload/file")
+		if *flag_preservename {
+			postURL += "?preserveName=true"
+		}
+
+		req, err := http.NewRequest("POST", postURL, body)
 		if err != nil {
 			fatal(err)
 		}
