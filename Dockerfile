@@ -1,5 +1,5 @@
 FROM golang
 MAINTAINER moshee <moshee@displaynone.us>
-RUN go get -u ktkr.us/pkg/airlift/cmd/airliftd
+RUN go install ktkr.us/pkg/airlift/cmd/airliftd@latest
 EXPOSE 60606
 ENTRYPOINT ["airliftd"]
