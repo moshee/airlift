@@ -1,5 +1,11 @@
 {{ define "content" }}
+
   <section id="upload" class="floating-section">
+    <div class="box checkbox" >
+      <input type="checkbox" id="preserve-name" name="preserve-name">
+      <label for="preserve-name">Preserve the original file name</label>
+    </div>
+
     <input type="file" id="picker" name="picker[]" multiple>
     <div id="drop-zone">
       <div class="progress-bar"></div>

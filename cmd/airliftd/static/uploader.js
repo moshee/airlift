@@ -1,7 +1,7 @@
 (function() {
 	'use strict';
 
-	var dropZone, dropZoneText, picker, urlList, bar;
+	var dropZone, dropZoneText, picker, urlList, bar, preserveName;
 
 	function paste(e) {
 		var item;
@@ -32,7 +32,7 @@
 		}
 
 		c.then(function(pass, fail, items) {
-			uploadFiles(items);
+			uploadFiles(items, preserveName.checked);
 		}).pass([]);
 	}
 
@@ -67,10 +67,10 @@
 	function dropped(e) {
 		e.stopPropagation();
 		e.preventDefault();
-		uploadFiles(e.dataTransfer.files);
+		uploadFiles(e.dataTransfer.files, preserveName.checked);
 	}
 
-	function uploadFiles(fileList) {
+	function uploadFiles(fileList, preserveName) {
 		if (fileList == null || fileList.length == 0) {
 			finish();
 			return;
@@ -130,7 +130,11 @@
 		for (var i = 0; i < fileList.length; i++) {
 			(function(file) {
 				c.then(function(pass, fail, result, totalLoaded) {
-					json('POST', '/upload/web', file, function(code, resp) {
+          var path = '/upload/web'
+          if (preserveName) {
+            path += '?preserveName=true'
+          }
+					json('POST', path, file, function(code, resp) {
 						switch (code) {
 						case 201:
 							result.push(window.location.protocol + '//' + resp.URL);
@@ -171,7 +175,13 @@
 			if (svg != null) {
 				svg.sacrificeChildren();
 			}
-		}).catch(errorMessage).pass([], 0);
+    }).catch(e => {
+			finish();
+		  dropZoneText.innerText = dropZoneText.dataset.oldText;
+			dropZone.removeEventListener('click', cancel);
+			dropZone.addEventListener('click', clickPicker);
+      errorMessage(e);
+    }).pass([], 0);
 	}
 
 	function finish() {
@@ -206,9 +216,10 @@
 		picker       = $('#picker');
 		urlList      = $('#uploaded-urls');
 		bar          = dropZone.querySelector('.progress-bar');
+		preserveName = $('#preserve-name');
 
 		picker.addEventListener('change', function(e) {
-			uploadFiles(this.files);
+			uploadFiles(this.files, preserveName.checked);
 		}, false);
 
 		window.addEventListener('paste', paste, false);
